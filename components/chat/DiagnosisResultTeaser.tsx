@@ -2,26 +2,27 @@
 
 import { useState } from "react";
 
-// TODO: diagnosis_results / diagnosis_result_benefits 실제 데이터로 교체 (docs/database-schema.md 참고)
-const DUMMY_PERSONA = {
-  emoji: "⚖️",
-  name: "밸런스형",
-  tagline: "특정 카테고리에 치우치지 않고 고르게 소비하는 균형 잡힌 타입이에요.",
-};
+export interface DiagnosisResultBenefit {
+  provider: string;
+  title: string;
+  monthlySaving: number;
+}
 
-const DUMMY_BENEFITS = [
-  { title: "OTT 결합 할인", provider: "SKT", monthly: 5000 },
-  { title: "편의점 정기 할인 쿠폰", provider: "KT", monthly: 3000 },
-  { title: "모바일 데이터 추가 제공", provider: "LG U+", monthly: 4000 },
-];
-
-const TOTAL_MONTHLY = DUMMY_BENEFITS.reduce((sum, benefit) => sum + benefit.monthly, 0);
+export interface DiagnosisResultData {
+  personaEmoji: string;
+  personaName: string;
+  description: string;
+  benefits: DiagnosisResultBenefit[];
+  totalMonthlySaving: number;
+  totalYearlySaving: number;
+}
 
 interface DiagnosisResultTeaserProps {
+  result: DiagnosisResultData;
   onRestart: () => void;
 }
 
-export default function DiagnosisResultTeaser({ onRestart }: DiagnosisResultTeaserProps) {
+export default function DiagnosisResultTeaser({ result, onRestart }: DiagnosisResultTeaserProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -35,27 +36,27 @@ export default function DiagnosisResultTeaser({ onRestart }: DiagnosisResultTeas
 
       <div className="mt-2 flex items-center gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-zinc-800">
-          {DUMMY_PERSONA.emoji}
+          {result.personaEmoji}
         </div>
         <div>
-          <p className="text-lg font-bold text-zinc-900 dark:text-zinc-50">{DUMMY_PERSONA.name}</p>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{DUMMY_PERSONA.tagline}</p>
+          <p className="text-lg font-bold text-zinc-900 dark:text-zinc-50">{result.personaName}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{result.description}</p>
         </div>
       </div>
 
       <div className="mt-4 rounded-2xl bg-white/70 p-3 dark:bg-zinc-900/50">
         <p className="text-xs text-zinc-500 dark:text-zinc-400">예상 월 절감액</p>
         <p className="mt-0.5 text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">
-          {TOTAL_MONTHLY.toLocaleString()}원
+          {result.totalMonthlySaving.toLocaleString()}원
         </p>
         <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-          티끌 모아 태산! 1년이면 {(TOTAL_MONTHLY * 12).toLocaleString()}원을 아낄 수 있어요.
+          티끌 모아 태산! 1년이면 {result.totalYearlySaving.toLocaleString()}원을 아낄 수 있어요.
         </p>
       </div>
 
       {expanded && (
         <ul className="mt-3 space-y-2">
-          {DUMMY_BENEFITS.map((benefit) => (
+          {result.benefits.map((benefit) => (
             <li
               key={benefit.title}
               className="flex items-center justify-between rounded-xl border border-zinc-100 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900"
@@ -67,7 +68,7 @@ export default function DiagnosisResultTeaser({ onRestart }: DiagnosisResultTeas
                 {benefit.title}
               </span>
               <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-                -{benefit.monthly.toLocaleString()}원/월
+                -{benefit.monthlySaving.toLocaleString()}원/월
               </span>
             </li>
           ))}

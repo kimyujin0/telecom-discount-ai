@@ -3,15 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import ChatBubble from "./ChatBubble";
 import ChatInputBar from "./ChatInputBar";
-import DiagnosisResultTeaser from "./DiagnosisResultTeaser";
+import DiagnosisResultTeaser, { type DiagnosisResultData } from "./DiagnosisResultTeaser";
 import TypingIndicator from "./TypingIndicator";
 import type { ChatMessageItem } from "./types";
-import {
-  CLOSING_MESSAGE,
-  FOLLOW_UP_QUESTIONS,
-  INITIAL_GREETING,
-  TOTAL_USER_TURNS,
-} from "@/lib/chat/dummy-flow";
+import { INITIAL_GREETING } from "@/lib/chat/constants";
+import { getPersonaByKey } from "@/lib/chat/personas";
+
+const DIAGNOSIS_MARKER = "<<<DIAGNOSIS_RESULT_JSON>>>";
+
+interface DiagnosisMarkerPayload {
+  done: true;
+  personaKey: string;
+  personaName: string;
+  description: string;
+  benefits: { provider: string; title: string; monthlySaving: number }[];
+  totalMonthlySaving: number;
+  totalYearlySaving: number;
+}
 
 let messageIdCounter = 0;
 const nextMessageId = () => `msg-${Date.now()}-${messageIdCounter++}`;
@@ -24,44 +32,107 @@ export default function ChatDiagnosis() {
   const [messages, setMessages] = useState<ChatMessageItem[]>(createInitialMessages);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [userTurns, setUserTurns] = useState(0);
-  const [isComplete, setIsComplete] = useState(false);
+  const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResultData | null>(null);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isTyping]);
 
-  // TODO: Vercel AI SDK + Claude API 연동 시 이 함수를 app/api/diagnosis 호출로 교체
-  const handleSend = () => {
+  const updateAssistantMessage = (id: string, content: string) => {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, content } : m)));
+  };
+
+  const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || isTyping || isComplete) return;
+    if (!trimmed || isTyping || diagnosisResult) return;
 
-    const userMessage: ChatMessageItem = { id: nextMessageId(), role: "user", content: trimmed };
-    const nextTurn = userTurns + 1;
-
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [...prev, { id: nextMessageId(), role: "user", content: trimmed }]);
     setInput("");
-    setUserTurns(nextTurn);
     setIsTyping(true);
 
-    const replyDelay = 600 + Math.random() * 500;
-    window.setTimeout(() => {
-      const isLastTurn = nextTurn >= TOTAL_USER_TURNS;
-      const replyContent = isLastTurn ? CLOSING_MESSAGE : FOLLOW_UP_QUESTIONS[nextTurn - 1];
+    const assistantId = nextMessageId();
+    setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }]);
 
-      setMessages((prev) => [...prev, { id: nextMessageId(), role: "assistant", content: replyContent }]);
+    try {
+      const response = await fetch("/api/diagnose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: sessionIdRef.current, message: trimmed }),
+      });
+
+      if (!response.ok || !response.body) {
+        const errorBody = await response.json().catch(() => null);
+        updateAssistantMessage(
+          assistantId,
+          errorBody?.error ?? "진단 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.",
+        );
+        setIsTyping(false);
+        return;
+      }
+
+      const headerSessionId = response.headers.get("X-Session-Id");
+      if (headerSessionId) sessionIdRef.current = headerSessionId;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let rendered = 0;
+      let markerIndex = -1;
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        if (markerIndex === -1) {
+          const idx = buffer.indexOf(DIAGNOSIS_MARKER);
+          if (idx === -1) {
+            const toRender = buffer.slice(rendered);
+            if (toRender) {
+              rendered = buffer.length;
+              updateAssistantMessage(assistantId, buffer.slice(0, rendered));
+            }
+          } else {
+            markerIndex = idx;
+            rendered = buffer.length;
+            updateAssistantMessage(assistantId, buffer.slice(0, markerIndex).trimEnd());
+          }
+        }
+      }
+
+      if (markerIndex !== -1) {
+        const jsonPart = buffer.slice(markerIndex + DIAGNOSIS_MARKER.length).trim();
+        try {
+          const payload = JSON.parse(jsonPart) as DiagnosisMarkerPayload;
+          const persona = getPersonaByKey(payload.personaKey);
+          setDiagnosisResult({
+            personaEmoji: persona?.emoji ?? "🎯",
+            personaName: payload.personaName,
+            description: payload.description,
+            benefits: payload.benefits,
+            totalMonthlySaving: payload.totalMonthlySaving,
+            totalYearlySaving: payload.totalYearlySaving,
+          });
+        } catch (parseError) {
+          console.error("Failed to parse diagnosis result payload", parseError);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to reach /api/diagnose", error);
+      updateAssistantMessage(assistantId, "네트워크 오류로 답변을 받지 못했어요. 다시 시도해주세요.");
+    } finally {
       setIsTyping(false);
-      if (isLastTurn) setIsComplete(true);
-    }, replyDelay);
+    }
   };
 
   const handleRestart = () => {
+    sessionIdRef.current = null;
     setMessages(createInitialMessages());
     setInput("");
     setIsTyping(false);
-    setUserTurns(0);
-    setIsComplete(false);
+    setDiagnosisResult(null);
   };
 
   return (
@@ -78,17 +149,17 @@ export default function ChatDiagnosis() {
 
       <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
-          {messages.map((message) => (
-            <ChatBubble key={message.id} message={message} />
-          ))}
-          {isTyping && <TypingIndicator />}
+          {messages.map((message) =>
+            message.content ? <ChatBubble key={message.id} message={message} /> : null,
+          )}
+          {isTyping && messages[messages.length - 1]?.content === "" && <TypingIndicator />}
           <div ref={scrollAnchorRef} />
         </div>
       </div>
 
-      {isComplete ? (
+      {diagnosisResult ? (
         <div className="mx-auto w-full max-w-2xl">
-          <DiagnosisResultTeaser onRestart={handleRestart} />
+          <DiagnosisResultTeaser result={diagnosisResult} onRestart={handleRestart} />
         </div>
       ) : (
         <div className="mx-auto w-full max-w-2xl">
