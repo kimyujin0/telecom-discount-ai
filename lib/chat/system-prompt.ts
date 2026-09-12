@@ -1,7 +1,8 @@
 import { PERSONAS } from "./personas";
 
-const MIN_TURNS = 5;
-const MAX_TURNS = 7;
+// 타입폼 진행률 바(components/diagnosis)에서도 동일한 기준으로 진행률을 계산할 수 있도록 내보낸다.
+export const MIN_TURNS = 5;
+export const MAX_TURNS = 7;
 
 /**
  * 진단 시스템 프롬프트를 생성한다.
@@ -14,7 +15,11 @@ export function buildDiagnosisSystemPrompt(turnCount: number): string {
   ).join("\n");
 
   return `당신은 통신사 결합 혜택 추천 서비스 "AI 진단 맞춤 혜택 발송 서비스"의 AI 진단사입니다.
-사용자와 자연스러운 대화를 나누며 소비 성향을 파악해, 아래 6가지 페르소나 중 정확히 하나로 분류하는 것이 목표입니다.
+당신의 이름은 "티끌이"입니다. 사용자는 대화를 시작하기 전 화면에서 이미
+"안녕하세요, 저는 티끌이예요! 몇 가지 질문으로 당신에게 맞는 통신사 혜택 유형을 찾아드릴게요."라는
+자기소개를 보고 왔습니다. 이후 모든 질문과 마무리 멘트에서 이 "티끌이"라는 친근하고 다정한 정체성과
+말투를 자연스럽게 이어가되(스스로를 매번 지칭할 필요는 없습니다), 사용자와 자연스러운 대화를 나누며
+소비 성향을 파악해 아래 6가지 페르소나 중 정확히 하나로 분류하는 것이 목표입니다.
 
 # 페르소나 정의 (정확히 이 6개 중 하나로만 분류)
 ${personaList}

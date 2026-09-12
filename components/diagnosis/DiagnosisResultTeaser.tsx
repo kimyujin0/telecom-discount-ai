@@ -25,6 +25,12 @@ interface DiagnosisResultTeaserProps {
 export default function DiagnosisResultTeaser({ result, onRestart }: DiagnosisResultTeaserProps) {
   const [expanded, setExpanded] = useState(false);
 
+  const handleKakaoNotify = () => {
+    // TODO: 카카오 "나에게 보내기"/알림톡 연동 (다음 프롬프트에서 별도 구현 예정)
+    // - 카카오 로그인 및 알림 수신 동의 처리
+    // - 사용자 식별자 + 이번 진단 결과(result)를 서버로 전달해 맞춤 혜택 알림톡 발송 요청
+  };
+
   return (
     <div className="result-card-enter mx-3 mb-3 rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 shadow-lg dark:border-indigo-900/40 dark:from-indigo-950/40 dark:via-zinc-900 dark:to-purple-950/30 sm:mx-4 sm:p-5">
       <div className="flex items-center gap-2">
@@ -89,6 +95,22 @@ export default function DiagnosisResultTeaser({ result, onRestart }: DiagnosisRe
           className="rounded-full border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           다시 진단
+        </button>
+      </div>
+
+      <div className="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+        <p className="text-center text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          진단 내용을 바탕으로 알림을 받으시겠어요?
+          <br />
+          *알림은 맞춤형 할인혜택이 카카오톡 알림톡으로 발송됩니다.
+        </p>
+        <button
+          type="button"
+          onClick={handleKakaoNotify}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-[#FEE500] px-4 py-2.5 text-sm font-bold text-zinc-900 transition-colors hover:bg-[#FDD800]"
+        >
+          <span aria-hidden>💬</span>
+          카카오로 받아보기
         </button>
       </div>
     </div>

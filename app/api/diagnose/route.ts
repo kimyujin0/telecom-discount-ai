@@ -1,6 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { NextResponse } from "next/server";
+import { isCarrierKey } from "@/lib/carriers";
 import { INITIAL_GREETING } from "@/lib/chat/constants";
 import { parseAssistantTurn } from "@/lib/chat/parse-diagnosis-result";
 import { buildDiagnosisSystemPrompt } from "@/lib/chat/system-prompt";
@@ -30,6 +31,8 @@ interface StoredMessage {
 interface DiagnoseRequestBody {
   sessionId?: string | null;
   message?: string;
+  /** 신규 세션 생성 시에만 사용 — 진단 질문 흐름 맨 처음에 받는 통신사 답변. */
+  carrier?: string;
 }
 
 function jsonError(message: string, status: number) {
@@ -52,11 +55,18 @@ export async function POST(request: Request) {
   const supabase = getSupabaseServerClient();
   let sessionId = body.sessionId ?? null;
   let dbMessages: StoredMessage[];
+  // 진단 완료 시 UC-02 혜택 매칭에서 이 통신사와 일치하는 benefits만 추천하도록 필터링한다.
+  let carrierValue: string | null = null;
 
   if (!sessionId) {
+    if (!isCarrierKey(body.carrier)) {
+      return jsonError("먼저 이용 중인 통신사를 선택해주세요. (KT/SKT/U+/알뜰폰)", 400);
+    }
+    carrierValue = body.carrier;
+
     const { data: session, error: sessionError } = await supabase
       .from("diagnosis_sessions")
-      .insert({ anonymous_key: crypto.randomUUID(), status: "in_progress" })
+      .insert({ anonymous_key: crypto.randomUUID(), status: "in_progress", carrier: carrierValue })
       .select("id")
       .single();
 
@@ -88,6 +98,21 @@ export async function POST(request: Request) {
       return jsonError("대화 이력을 불러오지 못했어요.", 500);
     }
     dbMessages = existing ?? [];
+
+    const { data: sessionRow, error: sessionFetchError } = await supabase
+      .from("diagnosis_sessions")
+      .select("carrier")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (sessionFetchError) {
+      console.error("[diagnose] failed to load session carrier", sessionFetchError);
+    }
+    carrierValue = sessionRow?.carrier ?? null;
+    if (!carrierValue) {
+      // 이 기능 도입 이전에 생성된 세션 등 예외 상황 — 통신사 필터 없이 진행한다.
+      console.warn("[diagnose] session has no carrier on file, skipping carrier filter", sessionId);
+    }
   }
 
   const nextTurnIndex = dbMessages.length;
@@ -215,11 +240,19 @@ export async function POST(request: Request) {
         return;
       }
 
-      const { data: matches, error: matchError } = await supabase
+      // UC-02: 페르소나로 매칭된 혜택 중에서도 반드시 사용자가 선택한 통신사(carrierValue)와
+      // 일치하는 혜택만 추천한다. carrierValue가 없는 예외 상황(위 참고)에서만 필터를 생략한다.
+      let benefitsQuery = supabase
         .from("persona_benefits")
-        .select("weight, benefits!inner(id, provider, title, estimated_monthly_saving, is_active)")
+        .select("weight, benefits!inner(id, provider, title, estimated_monthly_saving, is_active, carrier)")
         .eq("persona_id", personaRow.id)
-        .eq("benefits.is_active", true)
+        .eq("benefits.is_active", true);
+
+      if (carrierValue) {
+        benefitsQuery = benefitsQuery.eq("benefits.carrier", carrierValue);
+      }
+
+      const { data: matches, error: matchError } = await benefitsQuery
         .order("weight", { ascending: false })
         .limit(MATCHED_BENEFITS_LIMIT);
 
