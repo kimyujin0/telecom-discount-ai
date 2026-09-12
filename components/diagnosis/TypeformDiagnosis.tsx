@@ -1,5 +1,6 @@
 "use client";
 
+import { BadgePercent } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
@@ -243,10 +244,10 @@ function TypeformHeader() {
     <header className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/80">
       <div className="mx-auto flex h-14 max-w-3xl items-center px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-xs text-white">
-            🎯
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-emerald-400 text-white">
+            <BadgePercent className="h-4 w-4" strokeWidth={2.25} />
           </span>
-          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50">AI 혜택진단</span>
+          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50">내게맞는할인</span>
         </Link>
       </div>
     </header>
