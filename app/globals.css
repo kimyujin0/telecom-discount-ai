@@ -5,6 +5,20 @@
   --foreground: #171717;
 }
 
+/* 목업(메인페이지목업.png)에서 추출한 청록/에메랄드 브랜드 컬러. */
+@theme {
+  --color-primary-50: #f1faf8;
+  --color-primary-100: #e1f3ee;
+  --color-primary-200: #c3e7df;
+  --color-primary-300: #8ed0c4;
+  --color-primary-400: #4bb3a3;
+  --color-primary-500: #16897a;
+  --color-primary-600: #0d7a6e;
+  --color-primary-700: #096a60;
+  --color-primary-800: #075048;
+  --color-primary-900: #063f39;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
