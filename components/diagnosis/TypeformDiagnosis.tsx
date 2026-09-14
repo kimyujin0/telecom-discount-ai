@@ -247,7 +247,7 @@ function TypeformHeader() {
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-emerald-400 text-white">
             <BadgePercent className="h-4 w-4" strokeWidth={2.25} />
           </span>
-          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50">내게맞는할인</span>
+          <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50">하겸이를 위한 혜택</span>
         </Link>
       </div>
     </header>

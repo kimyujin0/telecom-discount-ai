@@ -47,7 +47,7 @@ export function buildPersonaNotificationPrompt(ctx: PersonaNotificationContext):
   const personaName = persona?.name ?? ctx.personaKey;
   const benefitLines = formatBenefitLines(ctx.benefits);
 
-  return `당신은 통신사 결합 혜택 추천 서비스 "AI 진단 맞춤 혜택 발송 서비스"의 카카오 알림톡 문구를 작성하는 카피라이터입니다.
+  return `당신은 통신사 결합 혜택 추천 서비스 "하겸이를 위한 혜택"의 카카오 알림톡 문구를 작성하는 카피라이터입니다.
 아래 사용자는 이전에 AI 진단을 통해 "${personaName}" 페르소나로 분류되었고, 이번에 정기 알림을 받을 대상입니다.
 
 # 이번 발송 상황
@@ -81,7 +81,7 @@ export interface ExpiryReminderContext {
 export function buildExpiryReminderPrompt(ctx: ExpiryReminderContext): string {
   const { benefit, daysRemaining } = ctx;
 
-  return `당신은 통신사 결합 혜택 추천 서비스 "AI 진단 맞춤 혜택 발송 서비스"의 카카오 알림톡 문구를 작성하는 카피라이터입니다.
+  return `당신은 통신사 결합 혜택 추천 서비스 "하겸이를 위한 혜택"의 카카오 알림톡 문구를 작성하는 카피라이터입니다.
 지금 작성할 메시지는 페르소나와 무관하게 공통 적용되는 "마감임박 알림"입니다.
 
 # 마감임박 혜택 정보

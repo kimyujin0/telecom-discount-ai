@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI 진단 맞춤 혜택 발송 서비스",
+  title: "하겸이를 위한 혜택",
   description: "대화형 AI가 소비 성향을 진단하고 맞춤 통신 혜택을 추천해드려요.",
 };
 
