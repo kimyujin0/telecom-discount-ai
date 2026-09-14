@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import CarrierBenefitsBoard from "@/components/carriers/CarrierBenefitsBoard";
+import CarrierHeroIllustration from "@/components/carriers/CarrierHeroIllustration";
 import type { BenefitCatalogItem } from "@/components/carriers/types";
 import SiteFooter from "@/components/layout/SiteFooter";
 import SiteHeader from "@/components/layout/SiteHeader";
+import { isBenefitCategory } from "@/lib/carrierBenefitCategories";
 import { getSupabasePublicClient } from "@/lib/supabase/public";
 
 export const metadata: Metadata = {
-  title: "통신사별 혜택 | AI 혜택진단",
-  description: "KT, SKT, U+, 알뜰폰 통신사별 혜택을 한눈에 비교해보세요.",
+  title: "통신사별 혜택 | 하겸이를 위한 혜택",
+  description: "SKT, KT, U+ 통신사별로 제공하는 다양한 할인 혜택을 등급별로 확인해보세요.",
 };
 
 // 카탈로그성 공개 데이터라 매 요청마다 새로 조회한다 (로그인 불필요, RLS의 public read 정책만 적용).
@@ -17,9 +19,11 @@ interface BenefitRow {
   id: string;
   provider: string;
   carrier: string;
+  tier: string | null;
+  category: string | null;
   title: string;
   description: string | null;
-  category: string;
+  usage_condition: string | null;
   discount_type: string;
   discount_value: number | null;
   estimated_monthly_saving: number;
@@ -32,7 +36,7 @@ async function loadBenefits(): Promise<{ items: BenefitCatalogItem[]; error: str
     const { data, error } = await supabase
       .from("benefits")
       .select(
-        "id, provider, carrier, title, description, category, discount_type, discount_value, estimated_monthly_saving, valid_to",
+        "id, provider, carrier, tier, category, title, description, usage_condition, discount_type, discount_value, estimated_monthly_saving, valid_to",
       )
       .eq("is_active", true)
       .order("carrier", { ascending: true })
@@ -48,9 +52,11 @@ async function loadBenefits(): Promise<{ items: BenefitCatalogItem[]; error: str
       id: row.id,
       provider: row.provider,
       carrier: row.carrier as BenefitCatalogItem["carrier"],
+      tier: row.tier,
+      category: isBenefitCategory(row.category) ? row.category : null,
       title: row.title,
       description: row.description,
-      category: row.category,
+      usageCondition: row.usage_condition,
       discountType: row.discount_type as BenefitCatalogItem["discountType"],
       discountValue: row.discount_value,
       estimatedMonthlySaving: row.estimated_monthly_saving,
@@ -72,16 +78,23 @@ export default async function CarriersPage() {
       <SiteHeader active="carriers" />
 
       <main className="flex-1">
-        <section className="mx-auto max-w-6xl px-4 pt-12 pb-4 sm:px-6 sm:pt-16">
-          <p className="text-xs font-semibold tracking-wide text-indigo-600 uppercase dark:text-indigo-400">
-            통신사별 혜택
-          </p>
-          <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-zinc-900 sm:text-3xl dark:text-zinc-50">
-            KT, SKT, U+, 알뜰폰 혜택을 한눈에 비교해보세요
-          </h1>
-          <p className="mt-2 text-sm text-zinc-500 sm:text-base dark:text-zinc-400">
-            로그인 없이도 자유롭게 둘러볼 수 있어요. 내게 맞는 혜택이 궁금하다면 AI 진단도 받아보세요.
-          </p>
+        <section className="bg-gradient-to-b from-primary-50/60 to-white dark:from-primary-500/5 dark:to-zinc-950">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pt-12 pb-10 sm:px-6 sm:pt-16 sm:pb-14 lg:grid-cols-2 lg:gap-16">
+            <div>
+              <p className="text-sm font-bold text-primary-700 dark:text-primary-400">통신사별 할인 혜택 한눈에 보기</p>
+              <h1 className="mt-3 text-2xl leading-tight font-extrabold tracking-tight text-zinc-900 sm:text-3xl lg:text-[2.25rem] dark:text-zinc-50">
+                SKT, KT, U+ 통신사별로
+                <br />
+                제공하는 다양한 할인 혜택을 확인해보세요.
+              </h1>
+              <p className="mt-4 text-sm leading-relaxed text-zinc-500 sm:text-base dark:text-zinc-400">
+                통신사로 제공되는 멤버십 혜택과 제휴 할인을
+                <br />
+                등급별로 정리했어요. 내가 사용하는 통신사와 등급에 맞는 혜택을 찾아보세요.
+              </p>
+            </div>
+            <CarrierHeroIllustration />
+          </div>
         </section>
 
         <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 sm:pb-28">

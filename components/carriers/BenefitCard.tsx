@@ -1,60 +1,52 @@
-import { getPersonaByKey } from "@/lib/chat/personas";
+import { ChevronRight, Tag } from "lucide-react";
+import { BENEFIT_CATEGORY_ICONS } from "@/lib/carrierBenefitCategories";
+import { formatDiscount } from "@/lib/formatBenefit";
 import type { BenefitCatalogItem } from "./types";
 
-function formatDiscount(item: BenefitCatalogItem): string {
-  switch (item.discountType) {
-    case "percent":
-      return `${item.discountValue ?? 0}% 할인`;
-    case "fixed_amount":
-      return `${(item.discountValue ?? 0).toLocaleString()}원 할인`;
-    case "coupon":
-      return "할인 쿠폰 제공";
-    case "free_item":
-      return "무료 혜택 제공";
-    default:
-      return "";
-  }
-}
-
-function formatValidTo(validTo: string | null): string | null {
-  if (!validTo) return null;
-  const [year, month, day] = validTo.split("-");
-  return `${year}.${month}.${day}까지`;
-}
-
-export default function BenefitCard({ item }: { item: BenefitCatalogItem }) {
-  const categoryName = getPersonaByKey(item.category)?.name ?? item.category;
-  const validToLabel = formatValidTo(item.validTo);
+export default function BenefitCard({
+  item,
+  onOpenDetail,
+}: {
+  item: BenefitCatalogItem;
+  onOpenDetail: (item: BenefitCatalogItem) => void;
+}) {
+  const Icon = item.category ? BENEFIT_CATEGORY_ICONS[item.category] : Tag;
 
   return (
     <div className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center gap-1.5">
-        <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
-          {item.provider}
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
+          <Icon className="h-5 w-5" />
         </span>
-        <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-          {categoryName}
-        </span>
+        {item.category && (
+          <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+            {item.category}
+          </span>
+        )}
       </div>
 
       <h3 className="mt-3 text-base font-bold text-zinc-900 dark:text-zinc-50">{item.title}</h3>
 
       {item.description && (
-        <p className="mt-1.5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-          {item.description}
-        </p>
+        <p className="mt-1.5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">{item.description}</p>
+      )}
+      {item.usageCondition && (
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">({item.usageCondition})</p>
       )}
 
-      <div className="mt-4 flex-1 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800/60">
-        <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{formatDiscount(item)}</p>
-        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-          예상 월 절감액 {item.estimatedMonthlySaving.toLocaleString()}원
-        </p>
+      <div className="mt-4 flex flex-1 items-end justify-between gap-2">
+        <span className="rounded-lg bg-primary-50 px-3 py-1.5 text-sm font-bold text-primary-700 dark:bg-primary-500/10 dark:text-primary-400">
+          {formatDiscount(item)}
+        </span>
+        <button
+          type="button"
+          onClick={() => onOpenDetail(item)}
+          className="flex shrink-0 items-center gap-1 text-sm font-semibold text-primary-700 hover:underline dark:text-primary-400"
+        >
+          내 혜택으로 보기
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
-
-      {validToLabel && (
-        <p className="mt-3 text-right text-[11px] text-zinc-400 dark:text-zinc-500">{validToLabel}</p>
-      )}
     </div>
   );
 }

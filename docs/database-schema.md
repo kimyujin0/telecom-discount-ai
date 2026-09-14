@@ -76,13 +76,21 @@ diagnosis_sessions ──1:N──► diagnosis_messages (턴 기반 채팅 로�
 
 ### 5. `benefits` — 통신사 혜택 카탈로그
 
+두 가지 서로 다른 축의 분류가 공존한다: `persona_category`(진단 매칭용, personas.key 값)와
+`category`(`/carriers` 페이지 열람용, 쇼핑/외식 등). 자세한 배경은
+[`0004_add_benefits_tier_category.sql`](../supabase/migrations/0004_add_benefits_tier_category.sql) 참고.
+
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid (PK) | |
-| `provider` | text | SKT / KT / LG U+ 등 |
+| `provider` | text | SKT / KT / LG U+ 등 (노출용 표기) |
+| `carrier` | text | `SKT` / `KT` / `U+` / `알뜰폰` — 필터용 정규화 값 ([`lib/carriers.ts`](../lib/carriers.ts) SSOT) |
+| `tier` | text (nullable) | 통신사별 등급 문자열. 통신사마다 체계가 달라 DB 체크 제약 없이 [`lib/carrierTiers.ts`](../lib/carrierTiers.ts)를 SSOT로 삼는다. 여러 등급 공통 적용은 `"GOLD·SILVER"`처럼 구분자로 나열, 전 등급 적용은 `"전체"` |
+| `category` | text (nullable) | `/carriers` 페이지 카테고리 필터 전용. `쇼핑`/`외식`/`카페`/`영화/문화`/`여행/레저`/`통신/기타` 중 하나 ([`lib/carrierBenefitCategories.ts`](../lib/carrierBenefitCategories.ts) SSOT) |
+| `usage_condition` | text (nullable) | 이용 횟수/시간대 조건 텍스트 (예: `"월 1회"`, `"1일 1회"`) |
+| `persona_category` | text (nullable) | 진단 결과 매칭(UC-02) 전용. `personas.key`와 동일한 값을 담아 시드 시점에 `persona_benefits`를 채운다 |
 | `title` | text | |
 | `description` | text | |
-| `category` | text | media / data / travel / cafe / mobility / etc |
 | `discount_type` | text | `percent` / `fixed_amount` / `coupon` / `free_item` |
 | `discount_value` | numeric (nullable) | |
 | `estimated_monthly_saving` | integer | 원 단위, "티끌모아 태산" 합산에 사용 |
