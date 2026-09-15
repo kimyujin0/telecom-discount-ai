@@ -39,11 +39,19 @@ export const diagnosisExtractionSchema = z.object({
     })
     .nullable()
     .describe("dataUsage/ottUsage/overseasUsage 중 비어있는 슬롯이 있으면 그중 하나를 겨냥한 질문 1개. 세 슬롯이 모두 채워졌으면 반드시 null."),
-  personaKey: z.enum(personaKeyTuple).describe("6가지 페르소나 중 가장 가까운 하나 (내부 분류용, 화면에는 노출되지 않음)"),
+  personaKey: z.enum(personaKeyTuple).describe("6가지 페르소나 중 가장 가까운 하나 (내부 분류용)"),
   personaDescription: z
     .string()
     .min(1)
     .describe("이번 대화 내용을 구체적으로 반영한 2~3문장 설명. 고정 문구 금지, 매번 새로 작성."),
+  personaTagline: z
+    .string()
+    .min(1)
+    .describe(
+      "결과 화면에 노출되는 짧은 한 줄. '당신은 '으로 시작해 personaKey의 페르소나 이름을 넣고 느낌표로 끝내세요 " +
+        "(예: '당신은 실속형 생활러!', '당신은 알뜰한 실속형 생활러시네요!'). 페르소나 이름 앞뒤 수식어는 이번 대화 내용에 " +
+        "맞춰 매번 다르게, 고정 문구 없이 새로 작성하세요.",
+    ),
 });
 
 export type DiagnosisExtraction = z.infer<typeof diagnosisExtractionSchema>;

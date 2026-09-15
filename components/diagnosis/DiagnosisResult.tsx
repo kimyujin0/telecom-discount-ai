@@ -15,6 +15,7 @@ export interface DiagnosisResultBenefit {
 }
 
 export interface DiagnosisResultData {
+  personaTagline: string;
   totalMonthlySaving: number;
   totalYearlySaving: number;
   benefits: DiagnosisResultBenefit[];
@@ -41,7 +42,12 @@ export default function DiagnosisResult({
       </div>
 
       <div className="mt-6 rounded-2xl bg-primary-50 p-5 text-center dark:bg-primary-500/10">
-        <p className="text-sm font-semibold text-primary-700 dark:text-primary-300">예상 연간 절약액</p>
+        {result.personaTagline && (
+          <p className="text-base font-extrabold text-primary-800 sm:text-lg dark:text-primary-200">
+            {result.personaTagline}
+          </p>
+        )}
+        <p className="mt-3 text-sm font-semibold text-primary-700 dark:text-primary-300">예상 연간 절약액</p>
         <p className="mt-1 text-3xl font-extrabold text-primary-700 sm:text-4xl dark:text-primary-300">
           약 {result.totalYearlySaving.toLocaleString()}원
         </p>

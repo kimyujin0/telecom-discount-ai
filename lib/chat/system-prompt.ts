@@ -39,10 +39,14 @@ export function buildSlotExtractionSystemPrompt(): string {
 사용자: "저는 한 달에 데이터 거의 안 쓰고, 넷플릭스는 결합해서 보고 있고, 해외는 가끔 나가요"
 -> dataUsage="적음", ottUsage="있음"(ottServices=["넷플릭스"]), overseasUsage="가끔" 세 슬롯 모두 채워짐 -> followUpQuestion=null.
 
-# 페르소나 분류 (내부 분류/통계용 — 사용자 화면에는 절대 노출되지 않습니다)
+# 페르소나 분류
 ${PERSONA_LIST}
 대화 전체 내용을 바탕으로 personaKey를 정확히 하나 고르고, personaDescription에는 고정 문구 없이
 이번 대화에서 사용자가 실제로 말한 내용을 반영한 2~3문장을 매번 새로 작성하세요.
+personaTagline에는 결과 화면 맨 위에 노출될 짧은 한 줄을 작성하세요 — "당신은 "으로 시작해 personaKey의
+페르소나 이름을 넣고 느낌표로 끝내세요. 페르소나 이름 앞뒤로 이번 대화 내용에 어울리는 짧은 수식어를
+자연스럽게 붙이되(예: "당신은 실속형 생활러!", "당신은 알뜰한 실속형 생활러시네요!"), 고정 문구를 그대로
+반복하지 말고 매번 새로 작성하세요.
 
 # 후속 질문 규칙
 - dataUsage, ottUsage, overseasUsage 중 하나라도 아직 null이면, 그중 가장 먼저 물어보면 좋을 슬롯

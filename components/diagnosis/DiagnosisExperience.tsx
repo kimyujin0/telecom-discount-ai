@@ -24,6 +24,7 @@ interface DiagnoseSuccessBody {
   done: boolean;
   question?: string;
   quickReplies?: string[];
+  personaTagline?: string;
   totalMonthlySaving?: number;
   totalYearlySaving?: number;
   benefits?: DiagnosisResultData["benefits"];
@@ -71,6 +72,7 @@ export default function DiagnosisExperience() {
       }
 
       setResult({
+        personaTagline: body.personaTagline ?? "",
         totalMonthlySaving: body.totalMonthlySaving ?? 0,
         totalYearlySaving: body.totalYearlySaving ?? 0,
         benefits: body.benefits ?? [],

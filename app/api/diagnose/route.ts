@@ -53,6 +53,7 @@ interface ResultBenefit {
 interface ResultResponseBody {
   sessionId: string;
   done: true;
+  personaTagline: string;
   totalMonthlySaving: number;
   totalYearlySaving: number;
   benefits: ResultBenefit[];
@@ -260,6 +261,7 @@ export async function POST(request: Request) {
   const responseBody: ResultResponseBody = {
     sessionId: finalSessionId,
     done: true,
+    personaTagline: extraction.personaTagline,
     totalMonthlySaving,
     totalYearlySaving: totalMonthlySaving * 12,
     benefits: resultBenefits,
