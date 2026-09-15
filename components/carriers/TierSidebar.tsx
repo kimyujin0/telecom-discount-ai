@@ -1,6 +1,6 @@
 "use client";
 
-import { Crown } from "lucide-react";
+import { ChevronRight, Crown } from "lucide-react";
 import { BENEFIT_CATEGORIES, type BenefitCategory } from "@/lib/carrierBenefitCategories";
 
 interface TierSidebarProps {
@@ -20,12 +20,10 @@ export default function TierSidebar({
 }: TierSidebarProps) {
   return (
     <aside className="space-y-6">
-      {/* 가장 중요한 선택이라는 걸 인지시키기 위해 테두리+배경으로 강조 */}
-      <div className="rounded-2xl border-2 border-primary-600 bg-primary-50/60 p-4 dark:border-primary-500/50 dark:bg-primary-500/10">
-        <p className="text-sm font-extrabold text-primary-800 dark:text-primary-300">등급별 혜택 보기</p>
-        <p className="mt-0.5 text-[11px] text-primary-600 dark:text-primary-400">가장 먼저 선택해주세요!</p>
+      <div>
+        <p className="text-sm font-bold text-zinc-700 dark:text-zinc-200">등급별 혜택 보기</p>
 
-        <div role="radiogroup" aria-label="등급 선택" className="mt-3 space-y-1.5">
+        <div role="radiogroup" aria-label="등급 선택" className="mt-3 space-y-2">
           {tiers.map((tier) => {
             const isActive = tier === selectedTier;
             const isTopTier = tier.includes("VIP");
@@ -36,10 +34,10 @@ export default function TierSidebar({
                 role="radio"
                 aria-checked={isActive}
                 onClick={() => onSelectTier(tier)}
-                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-bold transition ${
+                className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm font-bold transition ${
                   isActive
-                    ? "bg-primary-700 text-white shadow-sm"
-                    : "bg-white text-zinc-600 hover:bg-primary-50 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    ? "border-primary-700 bg-primary-700 text-white shadow-sm"
+                    : "border-zinc-200 bg-white text-zinc-600 hover:bg-primary-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 }`}
               >
                 <span
@@ -52,6 +50,7 @@ export default function TierSidebar({
                   {isTopTier ? <Crown className="h-3.5 w-3.5" /> : tier.charAt(0)}
                 </span>
                 {tier}
+                <ChevronRight className={`ml-auto h-4 w-4 ${isActive ? "text-white/70" : "text-zinc-300 dark:text-zinc-600"}`} />
               </button>
             );
           })}

@@ -3,7 +3,6 @@ import { FileText } from "lucide-react";
 // 막대그래프/표의 수치는 모두 예시용 더미 데이터입니다. 실제 계산 로직은 추후 연결 예정.
 
 const BAR_DATA = [
-  { label: "받은 혜택", sub: "(지급된 포인트)", value: 40.7, color: "bg-primary-100 dark:bg-primary-500/20" },
   { label: "사용한 혜택", sub: "(실제 사용)", value: 40.7, color: "bg-primary-400 dark:bg-primary-500/60" },
   { label: "놓친 혜택", sub: "(미사용·소멸)", value: 59.3, color: "bg-amber-100 dark:bg-amber-500/30" },
 ];

@@ -75,7 +75,7 @@ export default function CarrierBenefitsBoard({ benefits }: { benefits: BenefitCa
               선택한 등급·카테고리에 맞는 혜택이 아직 없어요. 다른 조건을 선택해보세요.
             </p>
           ) : (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {filtered.map((item) => (
                 <BenefitCard key={item.id} item={item} onOpenDetail={setDetailItem} />
               ))}
