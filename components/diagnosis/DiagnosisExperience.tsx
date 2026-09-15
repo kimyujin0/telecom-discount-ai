@@ -2,17 +2,17 @@
 
 import { useRef, useState } from "react";
 import AnalyzingChecklist from "./AnalyzingChecklist";
-import DiagnosisIntro from "./DiagnosisIntro";
 import DiagnosisResult, { type DiagnosisResultData } from "./DiagnosisResult";
 import FollowUpQuestion from "./FollowUpQuestion";
 import FreeTextInput from "./FreeTextInput";
-import SiteFooter from "@/components/layout/SiteFooter";
 import SiteHeader from "@/components/layout/SiteHeader";
 
 // "AI 분석 중" 체크리스트 연출이 너무 순식간에 지나가 보이지 않도록 최소 노출 시간을 보장한다.
 const ANALYZING_MIN_MS = 2000;
 
-type Phase = "intro" | "input" | "analyzing" | "followup" | "result";
+// 소개 페이지(app/diagnosis/page.tsx)에서 CTA를 눌러 이미 /diagnosis/chat으로 넘어온 뒤이므로,
+// 이 컴포넌트는 인트로 없이 바로 자유 입력 단계에서 시작한다.
+type Phase = "input" | "analyzing" | "followup" | "result";
 
 interface FollowUpState {
   question: string;
@@ -30,7 +30,7 @@ interface DiagnoseSuccessBody {
 }
 
 export default function DiagnosisExperience() {
-  const [phase, setPhase] = useState<Phase>("intro");
+  const [phase, setPhase] = useState<Phase>("input");
   const [followUp, setFollowUp] = useState<FollowUpState | null>(null);
   const [result, setResult] = useState<DiagnosisResultData | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
@@ -90,20 +90,8 @@ export default function DiagnosisExperience() {
     setFollowUp(null);
     setResult(null);
     setErrorText(null);
-    setPhase("intro");
+    setPhase("input");
   };
-
-  if (phase === "intro") {
-    return (
-      <div className="flex min-h-dvh flex-col bg-white dark:bg-zinc-950">
-        <SiteHeader active="diagnosis" />
-        <main className="flex-1">
-          <DiagnosisIntro onStart={() => setPhase("input")} />
-        </main>
-        <SiteFooter />
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-zinc-50 dark:bg-zinc-950">
