@@ -1,10 +1,15 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText } from "ai";
+import { generateObject } from "ai";
 import { NextResponse } from "next/server";
-import { isCarrierKey } from "@/lib/carriers";
-import { INITIAL_GREETING } from "@/lib/chat/constants";
-import { parseAssistantTurn } from "@/lib/chat/parse-diagnosis-result";
-import { buildDiagnosisSystemPrompt } from "@/lib/chat/system-prompt";
+import { diagnosisExtractionSchema, reasonGenerationSchema } from "@/lib/chat/diagnosis-schema";
+import {
+  DEFAULT_SLOT_QUESTIONS,
+  firstMissingCoreSlot,
+  isCoreSlotsFilled,
+  type DiagnosisSlots,
+} from "@/lib/chat/slots";
+import { buildReasonGenerationPrompt, buildSlotExtractionSystemPrompt, MAX_FOLLOWUPS } from "@/lib/chat/system-prompt";
+import { matchBenefitsForSlots, type MatchedBenefitRow } from "@/lib/diagnosisBenefitMatch";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -17,11 +22,6 @@ const llmProvider = createOpenAI({
   apiKey: process.env.LLM_API_KEY,
   baseURL: process.env.LLM_BASE_URL,
 });
-const MATCHED_BENEFITS_LIMIT = 3;
-// 스트리밍 도중 이 문자열이 등장하면(=```diagnosis-result 코드 블록 시작) 그 뒤로는
-// 클라이언트에 원문을 흘려보내지 않는다. 시스템 프롬프트에서 코드 블록 용도로만 백틱을 쓰도록
-// 지시했으므로, 백틱 3개 등장 = 진단 결과 블록 시작으로 취급해도 안전하다.
-const FENCE_SENTINEL = "```";
 
 interface StoredMessage {
   role: string;
@@ -31,12 +31,45 @@ interface StoredMessage {
 interface DiagnoseRequestBody {
   sessionId?: string | null;
   message?: string;
-  /** 신규 세션 생성 시에만 사용 — 진단 질문 흐름 맨 처음에 받는 통신사 답변. */
-  carrier?: string;
+}
+
+interface FollowUpResponseBody {
+  sessionId: string;
+  done: false;
+  question: string;
+  quickReplies: string[];
+}
+
+interface ResultBenefit {
+  id: string;
+  provider: string;
+  carrier: string;
+  title: string;
+  category: string | null;
+  estimatedMonthlySaving: number;
+  reason: string;
+}
+
+interface ResultResponseBody {
+  sessionId: string;
+  done: true;
+  totalMonthlySaving: number;
+  totalYearlySaving: number;
+  benefits: ResultBenefit[];
 }
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
+}
+
+/** LLM이 reason을 빠뜨렸을 때를 대비한 안전망 — 슬롯 값을 반영하되 매번 고정 문구는 아니게 조합한다. */
+function fallbackReason(benefit: MatchedBenefitRow, slots: DiagnosisSlots): string {
+  const bits: string[] = [];
+  if (slots.dataUsage) bits.push(`데이터 ${slots.dataUsage} 사용`);
+  if (slots.ottUsage === "있음") bits.push("OTT 이용 중");
+  if (slots.overseasUsage && slots.overseasUsage !== "거의없음") bits.push(`해외 이용 ${slots.overseasUsage}`);
+  const basis = bits.length > 0 ? bits.join(", ") : "평소 소비 패턴";
+  return `${basis} 기준으로 "${benefit.title}" 혜택이 도움이 될 것 같아요.`;
 }
 
 export async function POST(request: Request) {
@@ -55,18 +88,11 @@ export async function POST(request: Request) {
   const supabase = getSupabaseServerClient();
   let sessionId = body.sessionId ?? null;
   let dbMessages: StoredMessage[];
-  // 진단 완료 시 UC-02 혜택 매칭에서 이 통신사와 일치하는 benefits만 추천하도록 필터링한다.
-  let carrierValue: string | null = null;
 
   if (!sessionId) {
-    if (!isCarrierKey(body.carrier)) {
-      return jsonError("먼저 이용 중인 통신사를 선택해주세요. (KT/SKT/U+/알뜰폰)", 400);
-    }
-    carrierValue = body.carrier;
-
     const { data: session, error: sessionError } = await supabase
       .from("diagnosis_sessions")
-      .insert({ anonymous_key: crypto.randomUUID(), status: "in_progress", carrier: carrierValue })
+      .insert({ anonymous_key: crypto.randomUUID(), status: "in_progress" })
       .select("id")
       .single();
 
@@ -76,16 +102,7 @@ export async function POST(request: Request) {
     }
 
     sessionId = session.id as string;
-
-    const { error: greetingError } = await supabase.from("diagnosis_messages").insert({
-      session_id: sessionId,
-      turn_index: 0,
-      role: "assistant",
-      content: INITIAL_GREETING,
-    });
-    if (greetingError) console.error("[diagnose] failed to store greeting", greetingError);
-
-    dbMessages = [{ role: "assistant", content: INITIAL_GREETING }];
+    dbMessages = [];
   } else {
     const { data: existing, error: historyError } = await supabase
       .from("diagnosis_messages")
@@ -98,25 +115,10 @@ export async function POST(request: Request) {
       return jsonError("대화 이력을 불러오지 못했어요.", 500);
     }
     dbMessages = existing ?? [];
-
-    const { data: sessionRow, error: sessionFetchError } = await supabase
-      .from("diagnosis_sessions")
-      .select("carrier")
-      .eq("id", sessionId)
-      .maybeSingle();
-
-    if (sessionFetchError) {
-      console.error("[diagnose] failed to load session carrier", sessionFetchError);
-    }
-    carrierValue = sessionRow?.carrier ?? null;
-    if (!carrierValue) {
-      // 이 기능 도입 이전에 생성된 세션 등 예외 상황 — 통신사 필터 없이 진행한다.
-      console.warn("[diagnose] session has no carrier on file, skipping carrier filter", sessionId);
-    }
   }
 
   const nextTurnIndex = dbMessages.length;
-  const userTurnCount = dbMessages.filter((m) => m.role === "user").length + 1;
+  const followUpsSoFar = dbMessages.filter((m) => m.role === "assistant").length;
 
   const { error: insertUserError } = await supabase.from("diagnosis_messages").insert({
     session_id: sessionId,
@@ -127,185 +129,141 @@ export async function POST(request: Request) {
   if (insertUserError) console.error("[diagnose] failed to store user message", insertUserError);
 
   const history = [...dbMessages, { role: "user" as const, content: userMessage }];
-
-  // streamText는 provider 호출이 실패해도 textStream 자체는 그냥 빈 스트림으로 끝날 수 있어서
-  // (for-await가 throw하지 않음), onError로 실패를 별도로 붙잡아둔다.
-  let modelCallError: unknown = null;
-
-  const result = streamText({
-    model: llmProvider(MODEL_ID),
-    system: buildDiagnosisSystemPrompt(userTurnCount),
-    messages: history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    temperature: 0.8,
-    onError: ({ error }) => {
-      modelCallError = error;
-    },
-  });
-
-  const encoder = new TextEncoder();
   const finalSessionId = sessionId;
 
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      let fullText = "";
-      let sentLength = 0;
-      let fenceIndex = -1;
+  // 1단계: 대화 전체에서 슬롯 + 페르소나(내부용) 구조화 추출
+  let extraction;
+  try {
+    const result = await generateObject({
+      model: llmProvider.chat(MODEL_ID),
+      schema: diagnosisExtractionSchema,
+      system: buildSlotExtractionSystemPrompt(),
+      messages: history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      temperature: 0.1,
+    });
+    extraction = result.object;
+  } catch (error) {
+    console.error("[diagnose] slot extraction failed", error);
+    return jsonError("죄송해요, AI 분석 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.", 500);
+  }
 
-      try {
-        for await (const chunk of result.textStream) {
-          fullText += chunk;
+  const slots: DiagnosisSlots = {
+    dataUsage: extraction.slots.dataUsage,
+    ottUsage: extraction.slots.ottUsage,
+    ottServices: extraction.slots.ottServices,
+    overseasUsage: extraction.slots.overseasUsage,
+    interestCategories: extraction.slots.interestCategories as DiagnosisSlots["interestCategories"],
+  };
 
-          if (fenceIndex === -1) {
-            const idx = fullText.indexOf(FENCE_SENTINEL);
-            if (idx === -1) {
-              const toSend = fullText.slice(sentLength);
-              if (toSend) {
-                controller.enqueue(encoder.encode(toSend));
-                sentLength = fullText.length;
-              }
-            } else {
-              fenceIndex = idx;
-              const toSend = fullText.slice(sentLength, fenceIndex).trimEnd();
-              if (toSend) controller.enqueue(encoder.encode(toSend));
-              sentLength = fullText.length;
-            }
-          }
-        }
-      } catch (streamError) {
-        console.error("[diagnose] streaming error", streamError);
-        controller.enqueue(encoder.encode("죄송해요, 진단 중 오류가 발생했어요. 다시 시도해주세요."));
-        controller.close();
-        return;
-      }
+  const coreFilled = isCoreSlotsFilled(slots);
 
-      if (modelCallError) {
-        console.error("[diagnose] model call failed", modelCallError);
-        controller.enqueue(encoder.encode("죄송해요, AI 응답을 받아오지 못했어요. 잠시 후 다시 시도해주세요."));
-        controller.close();
-        return;
-      }
+  if (!coreFilled && followUpsSoFar < MAX_FOLLOWUPS) {
+    const missingSlot = firstMissingCoreSlot(slots) ?? "dataUsage";
+    const modelFollowUp =
+      extraction.followUpQuestion && extraction.followUpQuestion.targetSlot === missingSlot
+        ? extraction.followUpQuestion
+        : null;
+    const fallback = DEFAULT_SLOT_QUESTIONS[missingSlot];
+    const question = modelFollowUp?.question ?? fallback.question;
+    const quickReplies = modelFollowUp?.quickReplies ?? fallback.quickReplies;
 
-      const { visibleText, diagnosis } = parseAssistantTurn(fullText);
-      const assistantTurnIndex = nextTurnIndex + 1;
+    const { error: assistantMsgError } = await supabase.from("diagnosis_messages").insert({
+      session_id: finalSessionId,
+      turn_index: nextTurnIndex + 1,
+      role: "assistant",
+      content: question,
+    });
+    if (assistantMsgError) console.error("[diagnose] failed to store follow-up question", assistantMsgError);
 
-      if (!diagnosis) {
-        const { error } = await supabase.from("diagnosis_messages").insert({
-          session_id: finalSessionId,
-          turn_index: assistantTurnIndex,
-          role: "assistant",
-          content: visibleText,
-        });
-        if (error) console.error("[diagnose] failed to store assistant message", error);
-        controller.close();
-        return;
-      }
+    const responseBody: FollowUpResponseBody = { sessionId: finalSessionId, done: false, question, quickReplies };
+    return NextResponse.json(responseBody, { headers: { "X-Session-Id": finalSessionId } });
+  }
 
-      const closingText = visibleText || "답변 감사해요! 진단이 완료됐어요 🎉 아래에서 결과를 확인해보세요.";
+  // 2단계: 슬롯이 채워졌거나(또는 후속 질문 한도 도달) — 페르소나 저장 + 혜택 매칭으로 진행
+  const { data: personaDbRow, error: personaError } = await supabase
+    .from("personas")
+    .select("id")
+    .eq("key", extraction.personaKey)
+    .maybeSingle();
 
-      const { error: assistantMsgError } = await supabase.from("diagnosis_messages").insert({
-        session_id: finalSessionId,
-        turn_index: assistantTurnIndex,
-        role: "assistant",
-        content: closingText,
+  if (personaError || !personaDbRow) {
+    console.error("[diagnose] unknown persona key from model", extraction.personaKey, personaError);
+    return jsonError("진단 결과를 저장하지 못했어요. 잠시 후 다시 시도해주세요.", 500);
+  }
+
+  const matchedBenefits = await matchBenefitsForSlots(supabase, slots);
+  const totalMonthlySaving = matchedBenefits.reduce((sum, b) => sum + b.estimated_monthly_saving, 0);
+
+  // 3단계: 매칭된 혜택 각각에 대한 추천 이유를, 슬롯 값을 근거로 LLM이 생성 (고정 문구 금지)
+  const reasonById = new Map<string, string>();
+  if (matchedBenefits.length > 0) {
+    try {
+      const reasonResult = await generateObject({
+        model: llmProvider.chat(MODEL_ID),
+        schema: reasonGenerationSchema,
+        system: buildReasonGenerationPrompt(slots, matchedBenefits),
+        messages: [{ role: "user", content: "위 내용을 바탕으로 reasons 배열을 작성해주세요." }],
+        temperature: 0.7,
       });
-      if (assistantMsgError) console.error("[diagnose] failed to store closing message", assistantMsgError);
-
-      const { data: personaRow, error: personaError } = await supabase
-        .from("personas")
-        .select("id, name")
-        .eq("key", diagnosis.personaKey)
-        .maybeSingle();
-
-      if (personaError || !personaRow) {
-        console.error("[diagnose] unknown persona key from model", diagnosis.personaKey, personaError);
-        controller.close();
-        return;
+      for (const r of reasonResult.object.reasons) {
+        reasonById.set(r.benefitId, r.reason);
       }
+    } catch (error) {
+      console.error("[diagnose] reason generation failed, falling back", error);
+    }
+  }
 
-      const { data: resultRow, error: resultError } = await supabase
-        .from("diagnosis_results")
-        .insert({
-          session_id: finalSessionId,
-          persona_id: personaRow.id,
-          persona_description: diagnosis.description,
-          model: MODEL_ID,
-          raw_model_output: { fullText },
-        })
-        .select("id")
-        .single();
+  const resultBenefits: ResultBenefit[] = matchedBenefits.map((b) => ({
+    id: b.id,
+    provider: b.provider,
+    carrier: b.carrier,
+    title: b.title,
+    category: b.category ?? b.persona_category,
+    estimatedMonthlySaving: b.estimated_monthly_saving,
+    reason: reasonById.get(b.id) ?? fallbackReason(b, slots),
+  }));
 
-      if (resultError || !resultRow) {
-        console.error("[diagnose] failed to store diagnosis result", resultError);
-        controller.close();
-        return;
-      }
+  const { data: resultRow, error: resultError } = await supabase
+    .from("diagnosis_results")
+    .insert({
+      session_id: finalSessionId,
+      persona_id: personaDbRow.id,
+      persona_description: extraction.personaDescription,
+      model: MODEL_ID,
+      raw_model_output: { extraction, slots, matchedBenefitIds: matchedBenefits.map((b) => b.id) },
+    })
+    .select("id")
+    .single();
 
-      // UC-02: 페르소나로 매칭된 혜택 중에서도 반드시 사용자가 선택한 통신사(carrierValue)와
-      // 일치하는 혜택만 추천한다. carrierValue가 없는 예외 상황(위 참고)에서만 필터를 생략한다.
-      let benefitsQuery = supabase
-        .from("persona_benefits")
-        .select("weight, benefits!inner(id, provider, title, estimated_monthly_saving, is_active, carrier)")
-        .eq("persona_id", personaRow.id)
-        .eq("benefits.is_active", true);
+  if (resultError || !resultRow) {
+    console.error("[diagnose] failed to store diagnosis result", resultError);
+    return jsonError("진단 결과를 저장하지 못했어요. 잠시 후 다시 시도해주세요.", 500);
+  }
 
-      if (carrierValue) {
-        benefitsQuery = benefitsQuery.eq("benefits.carrier", carrierValue);
-      }
+  if (matchedBenefits.length > 0) {
+    const { error: snapshotError } = await supabase.from("diagnosis_result_benefits").insert(
+      matchedBenefits.map((benefit, index) => ({
+        diagnosis_result_id: resultRow.id,
+        benefit_id: benefit.id,
+        rank: index + 1,
+        estimated_monthly_saving: benefit.estimated_monthly_saving,
+      })),
+    );
+    if (snapshotError) console.error("[diagnose] failed to store benefit snapshot", snapshotError);
+  }
 
-      const { data: matches, error: matchError } = await benefitsQuery
-        .order("weight", { ascending: false })
-        .limit(MATCHED_BENEFITS_LIMIT);
+  await supabase
+    .from("diagnosis_sessions")
+    .update({ status: "completed", completed_at: new Date().toISOString() })
+    .eq("id", finalSessionId);
 
-      if (matchError) console.error("[diagnose] failed to load matched benefits", matchError);
+  const responseBody: ResultResponseBody = {
+    sessionId: finalSessionId,
+    done: true,
+    totalMonthlySaving,
+    totalYearlySaving: totalMonthlySaving * 12,
+    benefits: resultBenefits,
+  };
 
-      type BenefitRow = { id: string; provider: string; title: string; estimated_monthly_saving: number };
-      const matchedBenefits: BenefitRow[] = (matches ?? [])
-        .map((m) => m.benefits as unknown as BenefitRow)
-        .filter((b): b is BenefitRow => Boolean(b));
-
-      if (matchedBenefits.length > 0) {
-        const { error: snapshotError } = await supabase.from("diagnosis_result_benefits").insert(
-          matchedBenefits.map((benefit, index) => ({
-            diagnosis_result_id: resultRow.id,
-            benefit_id: benefit.id,
-            rank: index + 1,
-            estimated_monthly_saving: benefit.estimated_monthly_saving,
-          })),
-        );
-        if (snapshotError) console.error("[diagnose] failed to store benefit snapshot", snapshotError);
-      }
-
-      await supabase
-        .from("diagnosis_sessions")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("id", finalSessionId);
-
-      const totalMonthlySaving = matchedBenefits.reduce((sum, b) => sum + b.estimated_monthly_saving, 0);
-
-      const marker = {
-        done: true,
-        personaKey: diagnosis.personaKey,
-        personaName: personaRow.name,
-        description: diagnosis.description,
-        benefits: matchedBenefits.map((b) => ({
-          provider: b.provider,
-          title: b.title,
-          monthlySaving: b.estimated_monthly_saving,
-        })),
-        totalMonthlySaving,
-        totalYearlySaving: totalMonthlySaving * 12,
-      };
-
-      controller.enqueue(encoder.encode(`\n\n<<<DIAGNOSIS_RESULT_JSON>>>${JSON.stringify(marker)}`));
-      controller.close();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "X-Session-Id": finalSessionId,
-      "Cache-Control": "no-store",
-    },
-  });
+  return NextResponse.json(responseBody, { headers: { "X-Session-Id": finalSessionId } });
 }

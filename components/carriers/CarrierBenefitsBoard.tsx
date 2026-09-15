@@ -4,18 +4,27 @@ import { Info } from "lucide-react";
 import { useMemo, useState } from "react";
 import { filterBenefits } from "@/lib/carrierBenefitFilter";
 import type { BenefitCategory } from "@/lib/carrierBenefitCategories";
-import { CARRIER_TIERS, type TieredCarrierKey } from "@/lib/carrierTiers";
+import { CARRIER_TIERS, isTieredCarrier, type TieredCarrierKey } from "@/lib/carrierTiers";
 import BenefitCard from "./BenefitCard";
 import BenefitDetailModal from "./BenefitDetailModal";
 import CarrierTabs from "./CarrierTabs";
 import TierSidebar from "./TierSidebar";
 import type { BenefitCatalogItem } from "./types";
 
-export default function CarrierBenefitsBoard({ benefits }: { benefits: BenefitCatalogItem[] }) {
-  const [carrier, setCarrier] = useState<TieredCarrierKey>("SKT");
-  const [tier, setTier] = useState<string>(CARRIER_TIERS.SKT[0]);
+export default function CarrierBenefitsBoard({
+  benefits,
+  initialDetailItem = null,
+}: {
+  benefits: BenefitCatalogItem[];
+  /** /diagnosis 결과 화면 등에서 특정 혜택으로 바로 진입할 때(예: ?benefit=id) 상세 모달을 즉시 연다. */
+  initialDetailItem?: BenefitCatalogItem | null;
+}) {
+  const initialCarrier: TieredCarrierKey =
+    initialDetailItem && isTieredCarrier(initialDetailItem.carrier) ? initialDetailItem.carrier : "SKT";
+  const [carrier, setCarrier] = useState<TieredCarrierKey>(initialCarrier);
+  const [tier, setTier] = useState<string>(CARRIER_TIERS[initialCarrier][0]);
   const [categories, setCategories] = useState<BenefitCategory[]>([]);
-  const [detailItem, setDetailItem] = useState<BenefitCatalogItem | null>(null);
+  const [detailItem, setDetailItem] = useState<BenefitCatalogItem | null>(initialDetailItem);
 
   const handleCarrierChange = (next: TieredCarrierKey) => {
     setCarrier(next);

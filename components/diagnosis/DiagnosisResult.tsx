@@ -1,0 +1,115 @@
+"use client";
+
+import { ChevronDown, PartyPopper, RefreshCcw } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+
+export interface DiagnosisResultBenefit {
+  id: string;
+  provider: string;
+  carrier: string;
+  title: string;
+  category: string | null;
+  estimatedMonthlySaving: number;
+  reason: string;
+}
+
+export interface DiagnosisResultData {
+  totalMonthlySaving: number;
+  totalYearlySaving: number;
+  benefits: DiagnosisResultBenefit[];
+}
+
+export default function DiagnosisResult({
+  result,
+  onRestart,
+}: {
+  result: DiagnosisResultData;
+  onRestart: () => void;
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(result.benefits[0]?.id ?? null);
+
+  return (
+    <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex items-center gap-2">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
+          <PartyPopper className="h-4.5 w-4.5" />
+        </span>
+        <p className="text-lg font-extrabold text-zinc-900 sm:text-xl dark:text-zinc-50">
+          당신에게 맞는 혜택을 찾았어요!
+        </p>
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-primary-50 p-5 text-center dark:bg-primary-500/10">
+        <p className="text-sm font-semibold text-primary-700 dark:text-primary-300">예상 연간 절약액</p>
+        <p className="mt-1 text-3xl font-extrabold text-primary-700 sm:text-4xl dark:text-primary-300">
+          약 {result.totalYearlySaving.toLocaleString()}원
+        </p>
+        <p className="mt-1 text-xs text-primary-600/80 dark:text-primary-400/80">
+          (월 약 {result.totalMonthlySaving.toLocaleString()}원 절약) · 티끌 모아 태산!
+        </p>
+      </div>
+
+      {result.benefits.length === 0 ? (
+        <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500 dark:bg-zinc-800/50 dark:text-zinc-400">
+          조건에 딱 맞는 혜택을 아직 찾지 못했어요. 다시 진단하며 조금 더 이야기해주시면 더 정확히 찾아드릴게요.
+        </p>
+      ) : (
+        <div className="mt-6 space-y-2.5">
+          <p className="text-sm font-bold text-zinc-700 dark:text-zinc-200">추천 혜택</p>
+          {result.benefits.map((benefit) => {
+            const isExpanded = expandedId === benefit.id;
+            return (
+              <div
+                key={benefit.id}
+                className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+              >
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isExpanded ? null : benefit.id)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                      <span className="mr-1.5 rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                        {benefit.provider}
+                      </span>
+                      {benefit.title}
+                    </p>
+                    <p className="mt-0.5 text-xs font-semibold text-primary-600 dark:text-primary-400">
+                      월 {benefit.estimatedMonthlySaving.toLocaleString()}원 절약
+                    </p>
+                  </div>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-zinc-100 px-4 py-3.5 dark:border-zinc-800">
+                    <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{benefit.reason}</p>
+                    <Link
+                      href={`/carriers?benefit=${benefit.id}`}
+                      className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary-700 hover:underline dark:text-primary-400"
+                    >
+                      혜택 자세히 보기 →
+                    </Link>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onRestart}
+        className="mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-zinc-300 py-2.5 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+      >
+        <RefreshCcw className="h-3.5 w-3.5" />
+        다시 진단하기
+      </button>
+    </div>
+  );
+}

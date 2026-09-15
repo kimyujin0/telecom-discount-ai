@@ -70,8 +70,16 @@ async function loadBenefits(): Promise<{ items: BenefitCatalogItem[]; error: str
   }
 }
 
-export default async function CarriersPage() {
+export default async function CarriersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ benefit?: string }>;
+}) {
   const { items, error } = await loadBenefits();
+  const { benefit: benefitId } = await searchParams;
+  // /diagnosis 결과 화면의 "혜택 자세히 보기" 딥링크 — 이미 로드된 카탈로그(items)에서 id로 찾아
+  // 별도 조회 없이 상세 모달을 바로 연다.
+  const initialDetailItem = benefitId ? (items.find((item) => item.id === benefitId) ?? null) : null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-white dark:bg-zinc-950">
@@ -101,7 +109,7 @@ export default async function CarriersPage() {
           {error ? (
             <p className="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">{error}</p>
           ) : (
-            <CarrierBenefitsBoard benefits={items} />
+            <CarrierBenefitsBoard benefits={items} initialDetailItem={initialDetailItem} />
           )}
         </section>
       </main>

@@ -1,5 +1,5 @@
-import TypeformDiagnosis from "@/components/diagnosis/TypeformDiagnosis";
+import DiagnosisExperience from "@/components/diagnosis/DiagnosisExperience";
 
 export default function DiagnosisPage() {
-  return <TypeformDiagnosis />;
+  return <DiagnosisExperience />;
 }
