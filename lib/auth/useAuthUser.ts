@@ -33,6 +33,18 @@ export function useAuthUser(): { user: ClientAuthUser | null; loading: boolean }
     const supabase = getSupabaseBrowserClient();
     let active = true;
 
+    if (!supabase) {
+      // 환경변수 누락 등으로 클라이언트를 만들 수 없으면 "비로그인"으로 취급하고 조용히 넘어간다
+      // (원인은 getSupabaseBrowserClient가 이미 console.error로 남긴다). effect 몸체에서 setState를
+      // 동기 호출하지 않도록 Promise.resolve()로 한 틱 미룬다.
+      Promise.resolve().then(() => {
+        if (active) setLoading(false);
+      });
+      return () => {
+        active = false;
+      };
+    }
+
     supabase.auth.getUser().then(({ data }) => {
       if (!active) return;
       setUser(toClientUser(data.user));
