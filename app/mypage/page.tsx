@@ -9,7 +9,7 @@ import { CARRIER_LABELS } from "@/lib/carriers";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "마이페이지 | 하겸이를 위한 혜택",
+  title: "마이페이지 | 티모산",
   description: "가입 정보와 가장 최근 진단 결과를 확인해보세요.",
 };
 

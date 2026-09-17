@@ -8,7 +8,7 @@ import { isBenefitCategory } from "@/lib/carrierBenefitCategories";
 import { getSupabasePublicClient } from "@/lib/supabase/public";
 
 export const metadata: Metadata = {
-  title: "통신사별 혜택 | 하겸이를 위한 혜택",
+  title: "통신사별 혜택 | 티모산",
   description: "SKT, KT, U+ 통신사별로 제공하는 다양한 할인 혜택을 등급별로 확인해보세요.",
 };
 

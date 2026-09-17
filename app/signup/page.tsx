@@ -5,7 +5,7 @@ import SignupForm from "@/components/auth/SignupForm";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
-  title: "회원가입 | 하겸이를 위한 혜택",
+  title: "회원가입 | 티모산",
   description: "이메일과 이용 중인 통신사만 알려주시면 맞춤 혜택을 찾아드려요.",
 };
 

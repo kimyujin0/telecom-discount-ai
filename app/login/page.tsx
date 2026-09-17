@@ -5,7 +5,7 @@ import LoginForm from "@/components/auth/LoginForm";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
-  title: "로그인 | 하겸이를 위한 혜택",
+  title: "로그인 | 티모산",
   description: "이메일과 비밀번호로 로그인하고 나에게 맞는 통신 혜택을 관리해보세요.",
 };
 

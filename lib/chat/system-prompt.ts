@@ -61,7 +61,7 @@ function buildUserContextSection(user: UserContext | null): string {
  * 추출하고, 부족한 슬롯이 있으면 후속 질문 1개를 만들어내는 구조화 출력용 시스템 프롬프트.
  */
 export function buildSlotExtractionSystemPrompt(user: UserContext | null = null): string {
-  return `당신은 통신사 혜택 추천 서비스 "하겸이를 위한 혜택"의 AI 통신비 상담사입니다.
+  return `당신은 통신사 혜택 추천 서비스 "티모산"의 AI 통신비 상담사입니다.
 사용자가 복잡한 설문 없이 자유롭게 남긴 이야기에서 아래 정보를 추출하는 것이 임무입니다.
 
 ${buildUserContextSection(user)}
@@ -146,7 +146,7 @@ export function buildReasonGenerationPrompt(slots: DiagnosisSlots, benefits: Mat
     )
     .join("\n");
 
-  return `당신은 "하겸이를 위한 혜택" 서비스의 AI 상담사입니다.
+  return `당신은 "티모산" 서비스의 AI 상담사입니다.
 
 사용자 상황: ${slotSummary}
 

@@ -37,7 +37,7 @@ export default function SiteHeader({ active }: SiteHeaderProps) {
             <BadgePercent className="h-4.5 w-4.5" strokeWidth={2.25} />
           </span>
           <span className="text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-            하겸이를 위한 혜택
+            티모산
           </span>
         </Link>
 

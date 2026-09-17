@@ -6,7 +6,7 @@ import SiteFooter from "@/components/layout/SiteFooter";
 import SiteHeader from "@/components/layout/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "혜택 진단 | 하겸이를 위한 혜택",
+  title: "혜택 진단 | 티모산",
   description: "AI 통신비 상담사가 당신의 라이프스타일을 분석해 맞춤 통신 혜택을 찾아드려요.",
 };
 
