@@ -3,24 +3,31 @@
 import { BadgePercent, Menu, User, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useAuthUser } from "@/lib/auth/useAuthUser";
 
-export type SiteNavKey = "home" | "diagnosis" | "carriers" | "how-to" | "faq";
+export type SiteNavKey = "home" | "diagnosis" | "carriers" | "mypage";
 
 interface SiteHeaderProps {
   /** 현재 페이지에 해당하는 메뉴를 강조 표시한다. */
   active?: SiteNavKey;
 }
 
+// "마이페이지"는 비로그인 상태에서도 노출하고, 클릭하면 /mypage가 /login으로 리다이렉트한다
+// (app/mypage/page.tsx의 requireUser() 참고) — 메뉴가 갑자기 나타나고 사라지는 레이아웃 흔들림이 없다.
 const NAV_ITEMS: { key: SiteNavKey; label: string; href: string }[] = [
   { key: "home", label: "홈", href: "/" },
   { key: "diagnosis", label: "혜택 진단", href: "/diagnosis" },
   { key: "carriers", label: "통신사별 비교", href: "/carriers" },
-  { key: "how-to", label: "이용방법", href: "/how-to" },
-  { key: "faq", label: "자주 묻는 질문", href: "/faq" },
+  { key: "mypage", label: "마이페이지", href: "/mypage" },
 ];
 
 export default function SiteHeader({ active }: SiteHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user, loading } = useAuthUser();
+
+  // 세션 확인이 끝나기 전에는 둘 중 아무것도 깜빡이지 않도록 라벨을 비워둔다.
+  const accountLabel = loading ? "" : (user?.email ?? "로그인");
+  const accountHref = user ? "/mypage" : "/login";
 
   return (
     <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/90">
@@ -52,11 +59,11 @@ export default function SiteHeader({ active }: SiteHeaderProps) {
 
         <div className="flex items-center gap-2">
           <Link
-            href="#"
-            className="hidden items-center gap-1.5 px-2 py-1.5 text-sm font-medium text-zinc-600 transition hover:text-zinc-900 sm:inline-flex dark:text-zinc-300 dark:hover:text-white"
+            href={accountHref}
+            className="hidden max-w-44 items-center gap-1.5 px-2 py-1.5 text-sm font-medium text-zinc-600 transition hover:text-zinc-900 sm:inline-flex dark:text-zinc-300 dark:hover:text-white"
           >
-            <User className="h-4 w-4" />
-            로그인
+            <User className="h-4 w-4 shrink-0" />
+            <span className="truncate">{accountLabel}</span>
           </Link>
           <button
             type="button"
@@ -90,11 +97,11 @@ export default function SiteHeader({ active }: SiteHeaderProps) {
             ))}
             <li>
               <Link
-                href="#"
+                href={accountHref}
                 onClick={() => setMenuOpen(false)}
-                className="block rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                className="block truncate rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-900"
               >
-                로그인
+                {accountLabel}
               </Link>
             </li>
           </ul>

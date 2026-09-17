@@ -5,6 +5,11 @@
 ## ERD 개요
 
 ```
+auth.users (Supabase Auth)
+   │ 1:1
+   ▼
+profiles (가입 시 선택한 이용 통신사)
+
 personas (6종 고정)
    │ 1:N
    ▼
@@ -43,8 +48,12 @@ diagnosis_sessions ──1:N──► diagnosis_messages (턴 기반 채팅 로�
 | `user_id` | uuid (FK → auth.users, nullable) | 로그인 사용자인 경우 |
 | `anonymous_key` | text (nullable) | 비로그인 사용자 식별용 |
 | `status` | text | `in_progress` / `completed` / `abandoned` |
+| `carrier` | text (nullable) | 대화에서 확인한 이용 통신사. 로그인 사용자는 `profiles.carrier`를 확인만 받고 채운다 (0003) |
+| `tier` | text (nullable) | 대화에서 확인한 멤버십 등급. `lib/carrierTiers.ts`의 값 또는 `'모름'`(TIER_UNKNOWN) (0007) |
 | `started_at` | timestamptz | |
 | `completed_at` | timestamptz (nullable) | |
+
+`carrier` + `tier`는 UC-02 혜택 매칭에서 `benefits.carrier` / `benefits.tier` 조건 필터링에 쓴다 (`lib/diagnosisBenefitMatch.ts`). 통신사마다 등급 체계가 달라(SKT 3단계 / KT 6단계 / U+ 7단계) `tier`에는 DB 체크 제약을 두지 않고 `lib/carrierTiers.ts`를 애플리케이션 SSOT로 삼는다.
 
 ### 3. `diagnosis_messages` — 턴 기반 채팅 로그
 
@@ -139,12 +148,38 @@ PK: `(persona_id, benefit_id)`
 
 카카오 액세스 토큰은 DB에 영속 저장하지 않는다 — 로그인 직후 서버 메모리/요청 스코프 내에서만 사용하고 즉시 폐기하는 것을 권장(보안). 재사용이 꼭 필요해지면 그때 암호화 컬럼을 추가한다.
 
+### 9. `profiles` — 로그인 사용자 프로필 (auth.users 1:1 확장)
+
+Supabase Auth의 `auth.users`에는 서비스 고유 컬럼을 추가할 수 없어, 회원가입 때 고른 **이용 중인 통신사**를 담는 1:1 확장 테이블을 따로 둔다. `id`를 `auth.users.id`와 동일하게 쓴다.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | uuid (PK, FK → auth.users, cascade delete) | `auth.users.id`와 동일 |
+| `email` | text (nullable) | 가입 이메일 사본 (조회 편의용) |
+| `carrier` | text (nullable) | 가입 시 선택한 통신사. `lib/carriers.ts`(SSOT)와 동일한 값만 허용 |
+| `created_at` / `updated_at` | timestamptz | `updated_at`은 `set_updated_at()` 트리거로 자동 갱신 |
+
+행 생성은 앱 코드가 아니라 **`auth.users` INSERT 트리거**(`handle_new_auth_user()`, security definer)가 담당한다. 회원가입은 `supabase.auth.signUp({ options: { data: { carrier } } })`로 호출하고, 트리거가 `raw_user_meta_data`의 `carrier`를 읽어 행을 만든다 — 앱에서 두 번 쓰는 방식은 두 번째 쓰기가 실패하면 "auth 유저는 있는데 프로필은 없는" 상태가 남는다.
+
+용도: `/mypage`의 가입 정보 표시, 진단 대화에서 "OO님은 SKT를 이용 중이시죠?" 확인 (`app/api/diagnose`).
+
 ## 접근 제어 (RLS) 방침
 
 - 모든 테이블 RLS 활성화
 - `personas`, `benefits`, `persona_benefits`(카탈로그성 데이터)는 `anon` 역할에 **읽기 전용** 허용
+- `profiles`는 **본인 행만** 읽기/수정 허용(`auth.uid() = id`). INSERT 정책은 두지 않는다 — 행 생성은 위 트리거만 담당한다.
 - `diagnosis_sessions` / `diagnosis_messages` / `diagnosis_results` / `diagnosis_result_benefits` / `kakao_send_logs`는 클라이언트가 직접 접근하지 않고, **`app/api/` 라우트 핸들러가 Supabase service role 키로만 접근** (서버에서 세션 소유권 검증 후 처리) — RLS는 anon/authenticated에 대해 기본 차단(deny-all)으로 둔다.
 
 ## 마이그레이션 파일
 
-실제 DDL은 [`supabase/migrations/0001_init_schema.sql`](../supabase/migrations/0001_init_schema.sql) 참고.
+실제 DDL은 `supabase/migrations/` 참고 — 번호 순서대로 적용한다.
+
+| 파일 | 내용 |
+| --- | --- |
+| [`0001_init_schema.sql`](../supabase/migrations/0001_init_schema.sql) | 초기 스키마 8개 테이블 + 절감액 합산 뷰 + RLS |
+| [`0002_add_benefits_carrier.sql`](../supabase/migrations/0002_add_benefits_carrier.sql) | `benefits.carrier` (통신사 필터용 정규화 값) |
+| [`0003_add_diagnosis_sessions_carrier.sql`](../supabase/migrations/0003_add_diagnosis_sessions_carrier.sql) | `diagnosis_sessions.carrier` |
+| [`0004_add_benefits_tier_category.sql`](../supabase/migrations/0004_add_benefits_tier_category.sql) | `category` → `persona_category` 개명 + `tier` / `category` / `usage_condition` 추가 |
+| [`0005_nullable_benefits_persona_category.sql`](../supabase/migrations/0005_nullable_benefits_persona_category.sql) | `benefits.persona_category` NOT NULL 해제 |
+| [`0006_create_profiles.sql`](../supabase/migrations/0006_create_profiles.sql) | `profiles` 테이블 + `auth.users` 트리거 + RLS |
+| [`0007_add_diagnosis_sessions_tier.sql`](../supabase/migrations/0007_add_diagnosis_sessions_tier.sql) | `diagnosis_sessions.tier` |

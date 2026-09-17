@@ -3,7 +3,7 @@
 import { Bot, SendHorizontal } from "lucide-react";
 import { useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { FREE_TEXT_PLACEHOLDER } from "@/lib/chat/constants";
+import { FREE_TEXT_PLACEHOLDER, OPENING_MESSAGE } from "@/lib/chat/constants";
 
 export default function FreeTextInput({ onSubmit }: { onSubmit: (text: string) => void }) {
   const [value, setValue] = useState("");
@@ -29,7 +29,7 @@ export default function FreeTextInput({ onSubmit }: { onSubmit: (text: string) =
           <Bot className="h-4.5 w-4.5" />
         </span>
         <p className="flex-1 pt-1 text-lg leading-relaxed font-semibold text-zinc-900 sm:text-xl dark:text-zinc-50">
-          지금 상황을 편하게 이야기해주세요. 데이터, OTT, 해외 이용 같은 이야기면 무엇이든 좋아요.
+          {OPENING_MESSAGE}
         </p>
       </div>
 

@@ -71,37 +71,49 @@ where b.source_url = 'demo-seed';
 -- ============================================================
 -- /carriers 페이지용 실제 통신사별 등급 혜택 (통신사 → 등급 → 카테고리 계단식 필터 시연용)
 -- 위 demo-seed 데이터와 달리 persona_category는 없다(진단 매칭 대상이 아님, 순수 카탈로그 열람용).
+-- 0005_nullable_benefits_persona_category.sql로 NOT NULL 제약을 풀어 이 컬럼 없이도 저장된다.
 -- 한 브랜드가 등급별로 할인율이 다르면(예: 메가MGC커피 VIP 20% / GOLD·SILVER 10%) 등급마다 별도
 -- 행으로 나눈다 — tier 컬럼은 한 행에 하나의 "등급 그룹"만 담기 때문. tier 판정 규칙은
 -- lib/carrierTiers.ts의 tierMatches() 참고 ("전체" = 전 등급, "GOLD·SILVER"처럼 구분자로 묶어서
 -- 여러 등급 공통 적용을 표현).
+-- 실제 조사된 통신사 멤버십 제휴처 데이터(SKT 13건 / KT 8건 / LG U+ 8건, 총 29건)로 구성.
+-- 카테고리는 lib/carrierBenefitCategories.ts(SSOT)의 6종(쇼핑/외식/카페/영화·문화/여행·레저/통신·기타)을
+-- 통신사별로 고르게 채우는 것을 목표로 했으나, 조사된 실데이터 범위 내에서 SKT는 통신/기타,
+-- LG U+는 외식 카테고리에 해당하는 제휴처가 확인되지 않아 두 조합은 비어 있다(추후 실데이터 확보 시 보강).
 insert into benefits
   (provider, carrier, tier, category, title, description, usage_condition, discount_type, discount_value, estimated_monthly_saving, source_url, is_active)
 values
-  -- ===== SKT =====
-  ('SKT', 'SKT', 'VIP',         '카페',     '메가MGC커피',               'VIP 등급 전용 할인',                                   '1일 1회',                         'percent',      20,    4500, 'carrier-page-seed', true),
-  ('SKT', 'SKT', 'GOLD·SILVER', '카페',     '메가MGC커피',               'GOLD·SILVER 등급 할인',                               '1일 1회',                         'percent',      10,    2500, 'carrier-page-seed', true),
-  ('SKT', 'SKT', 'VIP',         '외식',     '도미노피자',                 'VIP 등급 할인 또는 적립 선택',                        '1일 1회',                         'percent',      30,    9000, 'carrier-page-seed', true),
-  ('SKT', 'SKT', 'GOLD·SILVER', '외식',     '도미노피자',                 'GOLD·SILVER 등급 할인 또는 적립 선택',                '1일 1회',                         'percent',      20,    6000, 'carrier-page-seed', true),
-  ('SKT', 'SKT', 'VIP',         '외식',     '파리바게뜨 해피아워',         'VIP 등급 전용 해피아워 할인',                         '오후 8시~자정, 1만원 이상 구매 시', 'fixed_amount', 4000,  4000, 'carrier-page-seed', true),
-  ('SKT', 'SKT', '전체',        '여행/레저', '에버랜드·캐리비안베이',       '본인 40% 할인 + 동반 3인 30% 할인',                   '전 등급 적용',                     'percent',      40,   15000, 'carrier-page-seed', true),
-  ('SKT', 'SKT', '전체',        '쇼핑',     '삼다수 무라벨 생수',          '전 등급 상시 할인',                                   '전 등급 적용',                     'percent',      10,    1000, 'carrier-page-seed', true),
-  ('SKT', 'SKT', 'VIP',         '외식',     '배달의민족 처갓집양념치킨',    'VIP 등급 할인',                                       '1일 1회',                         'fixed_amount', 8000,  8000, 'carrier-page-seed', true),
-  ('SKT', 'SKT', 'GOLD·SILVER', '외식',     '배달의민족 처갓집양념치킨',    'GOLD·SILVER 등급 할인',                               '1일 1회',                         'fixed_amount', 6000,  6000, 'carrier-page-seed', true),
+  -- ===== SKT (등급: VIP/GOLD/SILVER) =====
+  ('SKT', 'SKT', 'VIP',         '카페',     '메가MGC커피',           'VIP 등급 전용 할인',                                     '1일 1회',                                  'percent',      20,    4500, 'carrier-page-seed', true),
+  ('SKT', 'SKT', 'GOLD·SILVER', '카페',     '메가MGC커피',           'GOLD·SILVER 등급 할인',                                 '1일 1회',                                  'percent',      10,    2500, 'carrier-page-seed', true),
+  ('SKT', 'SKT', 'VIP',         '외식',     '도미노피자',             'VIP 등급 할인 또는 적립 선택',                          '1일 1회',                                  'percent',      30,    9000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', 'GOLD·SILVER', '외식',     '도미노피자',             'GOLD·SILVER 등급 할인 또는 적립 선택',                  '1일 1회',                                  'percent',      20,    6000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', 'VIP',         '외식',     '파리바게뜨 해피아워',    'VIP 등급 전용 해피아워 할인',                           '오후 8시~자정, 1만원 이상 구매 시',        'fixed_amount', 4000,  4000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', 'VIP',         '외식',     '배달의민족 처갓집양념치킨', 'VIP 등급 할인',                                      '1일 1회',                                  'fixed_amount', 8000,  8000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', 'GOLD·SILVER', '외식',     '배달의민족 처갓집양념치킨', 'GOLD·SILVER 등급 할인',                              '1일 1회',                                  'fixed_amount', 6000,  6000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', '전체',        '쇼핑',     'GS25 T.USE.DAY',        '매주 화요일 도시락 등 구매 시 전 등급 할인',            '매주 화요일, 1000원당 200원 할인, 1일 1회 최대 2만원 한도', 'percent', 20, 3000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', 'VIP·GOLD',    '쇼핑',     'CU·세븐일레븐',          'VIP·GOLD 등급 할인',                                    '1000원당 100원 할인',                      'percent',      10,    2000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', 'SILVER',      '쇼핑',     'CU·세븐일레븐',          'SILVER 등급 할인',                                      '1000원당 50원 할인',                       'percent',      5,     1000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', '전체',        '쇼핑',     '삼다수 무라벨 생수',      '전 등급 상시 할인',                                     '전 등급 적용',                              'percent',      10,    1000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', '전체',        '영화/문화', '롯데시네마·메가박스',     '전 등급 영화 예매 할인',                                '1.1만원 이상 예매 시 최대 4천원 할인',     'fixed_amount', 4000,  4000, 'carrier-page-seed', true),
+  ('SKT', 'SKT', '전체',        '여행/레저', '에버랜드·캐리비안베이',   '본인 40% 할인 + 동반 3인 30% 할인',                     '전 등급 적용',                              'percent',      40,   15000, 'carrier-page-seed', true),
 
-  -- ===== KT =====
-  ('KT', 'KT', 'VIP',  '영화/문화', '밀리의서재',            'VIP초이스 대상, 연 6회 한도로 1개월 무료 이용권 제공',      '연 6회, 1회 1개월 무료',       'free_item', null, 9900,  'carrier-page-seed', true),
-  ('KT', 'KT', 'VVIP', '영화/문화', '밀리의서재',            'VVIP초이스 대상, 연 12회 한도로 3개월 무료 이용권 제공',    '연 12회, 1회 3개월 무료',      'free_item', null, 9900,  'carrier-page-seed', true),
-  ('KT', 'KT', 'VVIP', '영화/문화', '롯데시네마',            '생일 달 한정 무료 영화 예매권 3매 제공',                    '생일 월 1회, 3매 한정',        'free_item', null, 3000,  'carrier-page-seed', true),
-  ('KT', 'KT', '전체', '카페',     '오굿모닝(던킨도너츠·파리바게트·GS25)', '아침 시간대 전 등급 할인',              '아침 5~9시, 1일 1회',          'percent',   30,   4500,  'carrier-page-seed', true),
-  ('KT', 'KT', 'VIP',  '쇼핑',     'ABC마트',               'VIP초이스 대상, 일정 금액 이상 구매 시 할인',               '7만원 이상 구매 시',           'fixed_amount', 10000, 10000, 'carrier-page-seed', true),
-  ('KT', 'KT', 'VIP',  '여행/레저', '플레이타임 키즈카페',    '평일 2시간권 할인 + 보호자 1인 무료 동반',                  '평일 한정, 보호자 1인 무료',   'percent',   50,   8000,  'carrier-page-seed', true),
-  ('KT', 'KT', 'VVIP', '여행/레저', '플레이타임 키즈카페',    '월 1회 무료 이용',                                          '월 1회',                       'free_item', null, 15000, 'carrier-page-seed', true),
+  -- ===== KT (등급: VVIP/VIP/GOLD/SILVER/WHITE/일반) =====
+  ('KT', 'KT', 'VIP',  '통신/기타', '밀리의서재',            'VIP초이스 대상, 연 6회 한도로 1개월 무료 이용권 제공',      '연 6회, 1회 1개월 무료',              'free_item',    null,   9900,  'carrier-page-seed', true),
+  ('KT', 'KT', 'VVIP', '통신/기타', '밀리의서재',            'VVIP초이스 대상, 연 12회 한도로 3개월 무료 이용권 제공',    '연 12회, 1회 3개월 무료',             'free_item',    null,   9900,  'carrier-page-seed', true),
+  ('KT', 'KT', 'VIP',  '영화/문화', '롯데시네마',            'VIP 등급 대상, 본인 무료 관람 + 동반 3인 할인',             '월 1회, 연 6회 한도',                 'free_item',    null,   13000, 'carrier-page-seed', true),
+  ('KT', 'KT', '전체', '영화/문화', 'CGV·메가박스',           '전 등급 대상, 예매 시 할인(동반 3인까지 적용)',             '최대 5천원 할인, 동반 3인까지',       'fixed_amount', 5000,   5000,  'carrier-page-seed', true),
+  ('KT', 'KT', '전체', '카페',     '오굿모닝(던킨도너츠·파리바게트·GS25)', '아침 시간대 전 등급 할인',                    '아침 5~9시, 1일 1회',                 'percent',      30,     4500,  'carrier-page-seed', true),
+  ('KT', 'KT', 'VIP',  '쇼핑',     'ABC마트',               'VIP초이스 대상, 일정 금액 이상 구매 시 할인',               '7만원 이상 구매 시',                  'fixed_amount', 10000,  10000, 'carrier-page-seed', true),
+  ('KT', 'KT', 'VIP',  '여행/레저', '플레이타임 키즈카페',    '평일 2시간권 할인 + 보호자 1인 무료 동반',                  '평일 한정, 보호자 1인 무료',          'percent',      50,     8000,  'carrier-page-seed', true),
+  ('KT', 'KT', '전체', '외식',     '달달혜택(파리바게트 등)', '매월 15일~말일 한정, 전 등급 적용 할인',                    '매월 15일~말일',                      'coupon',       null,   3000,  'carrier-page-seed', true),
 
-  -- ===== U+ (LG U+) =====
-  ('LG U+', 'U+', 'VIP',                  '카페',     '스타벅스',            'VIP 등급, 음료 사이즈업 무료',                        '월 1회',              'free_item', null, 1000,  'carrier-page-seed', true),
-  ('LG U+', 'U+', 'VVIP',                 '카페',     '스타벅스',            'VVIP 등급, 아메리카노 톨 사이즈 무료',                 '월 1회',              'free_item', null, 4500,  'carrier-page-seed', true),
-  ('LG U+', 'U+', 'VVIP·VIP',             '카페',     '공차 VIP콕',          '나만의 콕 선택 시 블랙 밀크티 L 무료',                 '월 1회',              'free_item', null, 5000,  'carrier-page-seed', true),
-  ('LG U+', 'U+', 'VVIP+,VVIP,VIP+,VIP',  '영화/문화', '영화콕',              'VIP 이상 등급 대상, 나만의 콕 선택 시 무료 영화 1매',   '월 1회',              'free_item', null, 12000, 'carrier-page-seed', true),
-  ('LG U+', 'U+', '전체',                 '쇼핑',     'GS25·파리바게트 기본혜택', '전 등급 기본 멤버십 할인 쿠폰 제공',              '전 등급 적용',        'coupon',    null, 1000,  'carrier-page-seed', true),
-  ('LG U+', 'U+', '전체',                 '여행/레저', '현대면세점',           'GOLD 등급 자동 부여 + 구매액 할인',                    '전 등급 적용',        'percent',   15,   6000,  'carrier-page-seed', true);
+  -- ===== U+ (LG U+, 등급: VVIP+/VVIP/VIP+/VIP/GOLD/SILVER/일반) =====
+  ('LG U+', 'U+', 'VIP',                 '카페',     '스타벅스',    'VIP 등급, 음료 사이즈업 무료',                          '월 1회',                                       'free_item', null,  1000,  'carrier-page-seed', true),
+  ('LG U+', 'U+', 'VVIP',                '카페',     '스타벅스',    'VVIP 등급, 아메리카노 톨 사이즈 무료',                   '월 1회',                                       'free_item', null,  4500,  'carrier-page-seed', true),
+  ('LG U+', 'U+', 'VVIP·VIP',            '카페',     '공차 VIP콕',  'VVIP·VIP 등급 대상, 나만의 콕 선택 시 블랙 밀크티 L 무료', '월 1회',                                     'free_item', null,  5000,  'carrier-page-seed', true),
+  ('LG U+', 'U+', 'VVIP+,VVIP,VIP+,VIP', '영화/문화', 'CGV VIP콕',   'VIP 이상 등급 대상, 무료 예매 또는 1+1 예매 중 선택',    '월 1회 사용, 무료예매 연 3회 / 1+1예매 연 9회', 'free_item', null,  12000, 'carrier-page-seed', true),
+  ('LG U+', 'U+', '전체',                '영화/문화', '메가박스',    '전 등급 대상, 티켓 1매 무료 예매',                       '월 1회, 연 3회 한도',                          'free_item', null,  13000, 'carrier-page-seed', true),
+  ('LG U+', 'U+', 'VVIP·VIP',            '쇼핑',     'G마켓',       'VIP·VVIP 등급 대상, 구매 시 할인',                       '4천원/회, 월 2회, 최대 8천원',                 'fixed_amount', 4000, 8000, 'carrier-page-seed', true),
+  ('LG U+', 'U+', '전체',                '여행/레저', '현대면세점',   'GOLD 등급 자동 부여 + 구매액 할인',                      '전 등급 적용, 최대 15% 할인',                  'percent',   15,    6000,  'carrier-page-seed', true),
+  ('LG U+', 'U+', '전체',                '통신/기타', 'GS25·파리바게트 기본혜택', '전 등급 기본 멤버십 할인 쿠폰 제공',           '전 등급 적용',                                 'coupon',    null,  1000,  'carrier-page-seed', true);

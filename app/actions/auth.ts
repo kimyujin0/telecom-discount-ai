@@ -1,0 +1,149 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { CARRIERS } from "@/lib/carriers";
+import { createSupabaseAuthClient } from "@/lib/supabase/auth";
+
+// 로그인/회원가입/로그아웃 서버 액션.
+// 서버에서만 실행되므로 비밀번호가 클라이언트 번들이나 URL에 노출되지 않는다.
+
+const carrierTuple = CARRIERS as unknown as [string, ...string[]];
+
+const emailSchema = z.string().trim().min(1, "이메일을 입력해주세요.").pipe(z.email("이메일 형식이 올바르지 않아요."));
+
+const signUpSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(8, "비밀번호는 8자 이상으로 입력해주세요."),
+  carrier: z.enum(carrierTuple, { error: "이용 중인 통신사를 선택해주세요." }),
+});
+
+const signInSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1, "비밀번호를 입력해주세요."),
+});
+
+export interface AuthFormState {
+  /** 필드별 검증 오류 (입력 칸 아래에 표시). */
+  fieldErrors?: { email?: string; password?: string; carrier?: string };
+  /** 폼 전체에 대한 오류 (Supabase 응답 등). */
+  formError?: string;
+  /** 이메일 인증이 필요해 아직 로그인되지 않은 상태. */
+  emailConfirmationRequired?: boolean;
+  /** 입력값 유지용 — 오류로 폼이 다시 그려질 때 사용자가 다시 타이핑하지 않도록. */
+  values?: { email?: string; carrier?: string };
+}
+
+/** 로그인 후 돌아갈 경로. 외부 도메인으로 튕기는 오픈 리다이렉트를 막기 위해 내부 절대경로만 허용한다. */
+function safeNextPath(raw: FormDataEntryValue | null): string {
+  if (typeof raw !== "string") return "/mypage";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/mypage";
+  return raw;
+}
+
+/** Supabase가 돌려주는 영문 오류 메시지를 사용자에게 보여줄 한국어 문구로 옮긴다. */
+function translateAuthError(message: string): string {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("invalid login credentials")) {
+    return "이메일 또는 비밀번호가 올바르지 않아요.";
+  }
+  if (normalized.includes("email not confirmed")) {
+    return "아직 이메일 인증이 완료되지 않았어요. 받은 메일의 인증 링크를 먼저 눌러주세요.";
+  }
+  if (normalized.includes("already registered") || normalized.includes("already been registered")) {
+    return "이미 가입된 이메일이에요. 로그인해주세요.";
+  }
+  if (normalized.includes("password")) {
+    return "비밀번호를 다시 확인해주세요. (8자 이상)";
+  }
+  if (normalized.includes("rate limit") || normalized.includes("too many")) {
+    return "요청이 너무 많아요. 잠시 후 다시 시도해주세요.";
+  }
+  return "처리 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.";
+}
+
+export async function signUpAction(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const rawEmail = String(formData.get("email") ?? "");
+  const rawCarrier = String(formData.get("carrier") ?? "");
+  const keptValues = { email: rawEmail, carrier: rawCarrier };
+
+  const parsed = signUpSchema.safeParse({
+    email: rawEmail,
+    password: String(formData.get("password") ?? ""),
+    carrier: rawCarrier,
+  });
+
+  if (!parsed.success) {
+    const { fieldErrors } = z.flattenError(parsed.error);
+    return {
+      fieldErrors: {
+        email: fieldErrors.email?.[0],
+        password: fieldErrors.password?.[0],
+        carrier: fieldErrors.carrier?.[0],
+      },
+      values: keptValues,
+    };
+  }
+
+  const supabase = await createSupabaseAuthClient();
+  // options.data로 넘긴 carrier는 auth.users.raw_user_meta_data에 저장되고,
+  // 0006_create_profiles.sql의 트리거가 이를 읽어 profiles 행을 만든다.
+  const { data, error } = await supabase.auth.signUp({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    options: { data: { carrier: parsed.data.carrier } },
+  });
+
+  if (error) {
+    console.error("[auth] signUp failed", error);
+    return { formError: translateAuthError(error.message), values: keptValues };
+  }
+
+  // 프로젝트에서 이메일 인증을 켜두면 세션 없이 유저만 생성된다 — 이때는 로그인 상태가 아니다.
+  if (!data.session) {
+    return { emailConfirmationRequired: true, values: keptValues };
+  }
+
+  revalidatePath("/", "layout");
+  redirect(safeNextPath(formData.get("next")));
+}
+
+export async function signInAction(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const rawEmail = String(formData.get("email") ?? "");
+
+  const parsed = signInSchema.safeParse({
+    email: rawEmail,
+    password: String(formData.get("password") ?? ""),
+  });
+
+  if (!parsed.success) {
+    const { fieldErrors } = z.flattenError(parsed.error);
+    return {
+      fieldErrors: { email: fieldErrors.email?.[0], password: fieldErrors.password?.[0] },
+      values: { email: rawEmail },
+    };
+  }
+
+  const supabase = await createSupabaseAuthClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    return { formError: translateAuthError(error.message), values: { email: rawEmail } };
+  }
+
+  revalidatePath("/", "layout");
+  redirect(safeNextPath(formData.get("next")));
+}
+
+export async function signOutAction(): Promise<void> {
+  const supabase = await createSupabaseAuthClient();
+  const { error } = await supabase.auth.signOut();
+  if (error) console.error("[auth] signOut failed", error);
+
+  revalidatePath("/", "layout");
+  redirect("/");
+}

@@ -1,14 +1,24 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/session";
+import { normalizeTierInput, TIER_UNKNOWN } from "@/lib/carrierTiers";
 import { diagnosisExtractionSchema, reasonGenerationSchema } from "@/lib/chat/diagnosis-schema";
 import {
-  DEFAULT_SLOT_QUESTIONS,
+  buildSlotQuestion,
+  CARRIER_CONFIRM_MARKER,
   firstMissingCoreSlot,
   isCoreSlotsFilled,
+  isFixedQuestionSlot,
+  TIER_QUESTION_MARKER,
   type DiagnosisSlots,
 } from "@/lib/chat/slots";
-import { buildReasonGenerationPrompt, buildSlotExtractionSystemPrompt, MAX_FOLLOWUPS } from "@/lib/chat/system-prompt";
+import {
+  buildReasonGenerationPrompt,
+  buildSlotExtractionSystemPrompt,
+  MAX_FOLLOWUPS,
+  type UserContext,
+} from "@/lib/chat/system-prompt";
 import { matchBenefitsForSlots, type MatchedBenefitRow } from "@/lib/diagnosisBenefitMatch";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -66,6 +76,8 @@ function jsonError(message: string, status: number) {
 /** LLM이 reason을 빠뜨렸을 때를 대비한 안전망 — 슬롯 값을 반영하되 매번 고정 문구는 아니게 조합한다. */
 function fallbackReason(benefit: MatchedBenefitRow, slots: DiagnosisSlots): string {
   const bits: string[] = [];
+  if (slots.carrier) bits.push(`${slots.carrier} 이용`);
+  if (slots.tier && slots.tier !== TIER_UNKNOWN) bits.push(`${slots.tier} 등급`);
   if (slots.dataUsage) bits.push(`데이터 ${slots.dataUsage} 사용`);
   if (slots.ottUsage === "있음") bits.push("OTT 이용 중");
   if (slots.overseasUsage && slots.overseasUsage !== "거의없음") bits.push(`해외 이용 ${slots.overseasUsage}`);
@@ -86,6 +98,14 @@ export async function POST(request: Request) {
     return jsonError("메시지를 입력해주세요.", 400);
   }
 
+  // 로그인 사용자라면 회원가입 때 등록한 통신사를 대화에 활용한다 (확인만 받고 넘어가기 위함).
+  // 비로그인 사용자도 그대로 진단할 수 있으므로 여기서 인증을 강제하지 않는다.
+  const authUser = await getCurrentUser();
+  const userContext: UserContext = {
+    nickname: authUser?.nickname ?? null,
+    profileCarrier: authUser?.carrier ?? null,
+  };
+
   const supabase = getSupabaseServerClient();
   let sessionId = body.sessionId ?? null;
   let dbMessages: StoredMessage[];
@@ -93,7 +113,13 @@ export async function POST(request: Request) {
   if (!sessionId) {
     const { data: session, error: sessionError } = await supabase
       .from("diagnosis_sessions")
-      .insert({ anonymous_key: crypto.randomUUID(), status: "in_progress" })
+      .insert({
+        // 로그인 사용자는 user_id로 묶어 마이페이지에서 진단 이력을 찾을 수 있게 한다.
+        // diagnosis_sessions_owner_check 제약 때문에 둘 중 하나는 반드시 있어야 한다.
+        user_id: authUser?.id ?? null,
+        anonymous_key: authUser ? null : crypto.randomUUID(),
+        status: "in_progress",
+      })
       .select("id")
       .single();
 
@@ -121,6 +147,11 @@ export async function POST(request: Request) {
   const nextTurnIndex = dbMessages.length;
   const followUpsSoFar = dbMessages.filter((m) => m.role === "assistant").length;
 
+  // 같은 질문을 되묻지 않기 위해, 통신사 확인/등급 질문을 이미 했는지 대화 이력에서 확인한다.
+  const assistantMessages = dbMessages.filter((m) => m.role === "assistant");
+  const carrierConfirmAsked = assistantMessages.some((m) => m.content.includes(CARRIER_CONFIRM_MARKER));
+  const tierAsked = assistantMessages.some((m) => m.content.includes(TIER_QUESTION_MARKER));
+
   const { error: insertUserError } = await supabase.from("diagnosis_messages").insert({
     session_id: sessionId,
     turn_index: nextTurnIndex,
@@ -138,7 +169,7 @@ export async function POST(request: Request) {
     const result = await generateObject({
       model: llmProvider.chat(MODEL_ID),
       schema: diagnosisExtractionSchema,
-      system: buildSlotExtractionSystemPrompt(),
+      system: buildSlotExtractionSystemPrompt(userContext),
       messages: history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       temperature: 0.1,
     });
@@ -148,7 +179,15 @@ export async function POST(request: Request) {
     return jsonError("죄송해요, AI 분석 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.", 500);
   }
 
+  const carrier = extraction.slots.carrier ?? null;
+  // 등급은 자유 입력이라 통신사 등급 체계(lib/carrierTiers.ts)에 맞춰 정규화한다.
+  let tier = normalizeTierInput(carrier, extraction.slots.tier);
+  // 이미 등급을 물었는데도 해석 가능한 답이 안 나왔다면 "모름"으로 두고 넘어간다 (무한 되묻기 방지).
+  if (tier === null && tierAsked) tier = TIER_UNKNOWN;
+
   const slots: DiagnosisSlots = {
+    carrier,
+    tier,
     dataUsage: extraction.slots.dataUsage,
     ottUsage: extraction.slots.ottUsage,
     ottServices: extraction.slots.ottServices,
@@ -156,15 +195,33 @@ export async function POST(request: Request) {
     interestCategories: extraction.slots.interestCategories as DiagnosisSlots["interestCategories"],
   };
 
+  // 확인된 통신사/등급은 세션에 남겨 이후 조회(UC-02 매칭 근거, 마이페이지 등)에서 다시 쓸 수 있게 한다.
+  if (slots.carrier || slots.tier) {
+    const { error: sessionUpdateError } = await supabase
+      .from("diagnosis_sessions")
+      .update({ carrier: slots.carrier, tier: slots.tier })
+      .eq("id", finalSessionId);
+    if (sessionUpdateError) console.error("[diagnose] failed to store carrier/tier", sessionUpdateError);
+  }
+
   const coreFilled = isCoreSlotsFilled(slots);
 
   if (!coreFilled && followUpsSoFar < MAX_FOLLOWUPS) {
     const missingSlot = firstMissingCoreSlot(slots) ?? "dataUsage";
+    const fallback = buildSlotQuestion(missingSlot, {
+      carrier: slots.carrier,
+      profileCarrier: userContext.profileCarrier,
+      nickname: userContext.nickname,
+      carrierConfirmAsked,
+    });
+
+    // 통신사/등급은 표기가 정확해야 해서 서버 문구를 그대로 쓰고, 나머지는 LLM이 만든 문구를 우선한다.
     const modelFollowUp =
-      extraction.followUpQuestion && extraction.followUpQuestion.targetSlot === missingSlot
+      !isFixedQuestionSlot(missingSlot) &&
+      extraction.followUpQuestion &&
+      extraction.followUpQuestion.targetSlot === missingSlot
         ? extraction.followUpQuestion
         : null;
-    const fallback = DEFAULT_SLOT_QUESTIONS[missingSlot];
     const question = modelFollowUp?.question ?? fallback.question;
     const quickReplies = modelFollowUp?.quickReplies ?? fallback.quickReplies;
 
