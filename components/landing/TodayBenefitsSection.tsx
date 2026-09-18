@@ -1,5 +1,8 @@
-import { Calendar, Coffee, Coins, Film, LogIn, ShoppingBag, Utensils } from "lucide-react";
+"use client";
+
+import { Calendar, Coffee, Coins, Film, LogIn, ShoppingBag, Sparkles, Utensils } from "lucide-react";
 import Link from "next/link";
+import { useAuthUser } from "@/lib/auth/useAuthUser";
 
 // 카테고리 카드/절약액은 예시용 더미입니다. 실제 로그인 연동 후 사용자별 값으로 대체될 예정입니다.
 const CATEGORY_CARDS = [
@@ -10,6 +13,11 @@ const CATEGORY_CARDS = [
 ];
 
 export default function TodayBenefitsSection() {
+  // 로그인 판별은 헤더(SiteHeader)와 같은 훅을 그대로 재사용한다 — 로직이 두 곳에서 갈라지지 않게.
+  // 세션 확인이 끝나기 전(loading)에는 비로그인 문구를 기본값으로 보여준다.
+  const { user, loading } = useAuthUser();
+  const isLoggedIn = !loading && !!user;
+
   return (
     <section className="bg-white py-16 sm:py-20 dark:bg-zinc-950">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
@@ -31,11 +39,11 @@ export default function TodayBenefitsSection() {
               로그인하면, 오늘 바로 사용할 수 있는 맞춤 혜택을 알려드려요
             </p>
             <Link
-              href="#"
+              href={isLoggedIn ? "/mypage" : "/login"}
               className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary-700 px-6 py-3 text-sm font-bold text-white transition hover:bg-primary-800"
             >
-              <LogIn className="h-4 w-4" />
-              로그인하고 확인하기
+              {isLoggedIn ? <Sparkles className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+              {isLoggedIn ? "할인 확인하기" : "로그인하고 확인하기"}
             </Link>
           </div>
 
