@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import SiteFooter from "@/components/layout/SiteFooter";
 import SiteHeader from "@/components/layout/SiteHeader";
+import ChangePasswordForm from "@/components/mypage/ChangePasswordForm";
+import EditNicknameForm from "@/components/mypage/EditNicknameForm";
 import SignOutButton from "@/components/mypage/SignOutButton";
 import { requireUser } from "@/lib/auth/session";
 import { CARRIER_LABELS } from "@/lib/carriers";
@@ -47,9 +49,11 @@ export default async function MyPage() {
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
                   <User className="h-4 w-4" />
                 </span>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <dt className="text-xs font-medium text-zinc-500 dark:text-zinc-400">닉네임</dt>
-                  <dd className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">{user.nickname}</dd>
+                  <dd className="mt-0.5">
+                    <EditNicknameForm nickname={user.nickname} />
+                  </dd>
                 </div>
               </div>
 
@@ -81,6 +85,14 @@ export default async function MyPage() {
                 </div>
               </div>
             </dl>
+          </section>
+
+          {/* 비밀번호 변경 */}
+          <section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900">
+            <h2 className="text-sm font-bold text-zinc-700 dark:text-zinc-200">비밀번호 변경</h2>
+            <div className="mt-4">
+              <ChangePasswordForm />
+            </div>
           </section>
 
           {/* 최근 진단 결과 */}

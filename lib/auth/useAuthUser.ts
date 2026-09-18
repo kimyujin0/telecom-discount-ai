@@ -20,6 +20,13 @@ export interface ClientAuthUser {
   nickname: string;
 }
 
+/**
+ * 마이페이지에서 닉네임을 바꾼 뒤 헤더 등 이 훅을 쓰는 다른 컴포넌트에 즉시 반영하기 위한 이벤트.
+ * onAuthStateChange는 로그인/로그아웃에만 반응하고 프로필 행 변경은 감지하지 못해서 따로 둔다.
+ * 디스패치 쪽은 components/mypage/EditNicknameForm.tsx 참고.
+ */
+export const PROFILE_UPDATED_EVENT = "tmsan:profile-updated";
+
 /** profiles.nickname을 조회해 붙인다. 실패해도 로그인 자체는 막지 않고 이메일 기반 호칭으로 대체한다. */
 async function loadClientUser(supabase: SupabaseClient, user: User | null | undefined): Promise<ClientAuthUser | null> {
   if (!user) return null;
@@ -50,12 +57,16 @@ export function useAuthUser(): { user: ClientAuthUser | null; loading: boolean }
       };
     }
 
-    supabase.auth.getUser().then(async ({ data }) => {
-      const clientUser = await loadClientUser(supabase, data.user);
-      if (!active) return;
-      setUser(clientUser);
-      setLoading(false);
-    });
+    const refresh = () => {
+      supabase.auth.getUser().then(async ({ data }) => {
+        const clientUser = await loadClientUser(supabase, data.user);
+        if (!active) return;
+        setUser(clientUser);
+        setLoading(false);
+      });
+    };
+
+    refresh();
 
     const {
       data: { subscription },
@@ -67,9 +78,12 @@ export function useAuthUser(): { user: ClientAuthUser | null; loading: boolean }
       });
     });
 
+    window.addEventListener(PROFILE_UPDATED_EVENT, refresh);
+
     return () => {
       active = false;
       subscription.unsubscribe();
+      window.removeEventListener(PROFILE_UPDATED_EVENT, refresh);
     };
   }, []);
 
