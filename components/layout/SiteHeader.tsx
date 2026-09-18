@@ -1,6 +1,7 @@
 "use client";
 
-import { BadgePercent, Menu, User, X } from "lucide-react";
+import { Menu, User, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useAuthUser } from "@/lib/auth/useAuthUser";
@@ -32,10 +33,15 @@ export default function SiteHeader({ active }: SiteHeaderProps) {
   return (
     <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/90">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600 text-white shadow-sm">
-            <BadgePercent className="h-4.5 w-4.5" strokeWidth={2.25} />
-          </span>
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image
+            src="/logo.png"
+            alt="티모산 로고"
+            width={144}
+            height={96}
+            priority
+            className="h-9 w-auto object-contain"
+          />
           <span className="text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
             티모산
           </span>
