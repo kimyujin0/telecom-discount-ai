@@ -27,7 +27,7 @@ export default function SiteHeader({ active }: SiteHeaderProps) {
   const { user, loading } = useAuthUser();
 
   // 세션 확인이 끝나기 전에는 둘 중 아무것도 깜빡이지 않도록 라벨을 비워둔다.
-  const accountLabel = loading ? "" : (user?.email ?? "로그인");
+  const accountLabel = loading ? "" : (user?.nickname ?? "로그인");
   const accountHref = user ? "/mypage" : "/login";
 
   return (

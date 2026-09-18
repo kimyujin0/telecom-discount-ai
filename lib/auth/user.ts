@@ -6,20 +6,32 @@ import { isCarrierKey, type CarrierKey } from "@/lib/carriers";
 export interface AppUser {
   id: string;
   email: string | null;
-  /** 이메일 로컬파트에서 뽑은 호칭. "OO님은 SKT를 이용 중이시죠?" 같은 문구에 쓴다. */
+  /** 헤더/마이페이지/진단 대화 호칭에 쓰는 표시용 이름. resolveNickname()으로 계산한다. */
   nickname: string;
+  /** 회원가입 시 입력한 실명. 화면에는 노출하지 않는다. 0008 이전 가입자는 null. */
+  name: string | null;
   /** 회원가입 때 선택한 이용 중인 통신사. 미선택이면 null. */
   carrier: CarrierKey | null;
 }
 
 /**
- * 이메일에서 호칭을 만든다 (별도 이름 입력 필드가 없으므로 로컬파트를 사용).
+ * 이메일 로컬파트로 임시 호칭을 만든다. profiles.nickname이 없을 때(0008 마이그레이션 이전 가입자 등)의
+ * 대체값으로만 쓴다 — resolveNickname()을 거쳐서 사용할 것.
  * 너무 길면 자르고, 로컬파트가 없으면 "고객"으로 떨어진다.
  */
 export function nicknameFromEmail(email: string | null | undefined): string {
   const localPart = email?.split("@")[0]?.trim();
   if (!localPart) return "고객";
   return localPart.length > 12 ? `${localPart.slice(0, 12)}…` : localPart;
+}
+
+/**
+ * profiles.nickname을 우선 쓰고, 비어 있으면 이메일 로컬파트로 대체한다.
+ * 서버(lib/auth/session.ts)와 브라우저(lib/auth/useAuthUser.ts) 양쪽에서 같은 규칙을 쓰기 위한 SSOT.
+ */
+export function resolveNickname(profileNickname: string | null | undefined, email: string | null | undefined): string {
+  const trimmed = profileNickname?.trim();
+  return trimmed ? trimmed : nicknameFromEmail(email);
 }
 
 /**

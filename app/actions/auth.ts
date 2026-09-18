@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { PASSWORD_MIN_LENGTH, PASSWORD_SPECIAL_CHAR_REGEX } from "@/lib/auth/password";
 import { CARRIERS } from "@/lib/carriers";
 import { createSupabaseAuthClient } from "@/lib/supabase/auth";
 
@@ -13,9 +14,16 @@ const carrierTuple = CARRIERS as unknown as [string, ...string[]];
 
 const emailSchema = z.string().trim().min(1, "이메일을 입력해주세요.").pipe(z.email("이메일 형식이 올바르지 않아요."));
 
+const passwordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `비밀번호는 ${PASSWORD_MIN_LENGTH}자 이상으로 입력해주세요.`)
+  .regex(PASSWORD_SPECIAL_CHAR_REGEX, "특수문자를 최소 1개 포함해주세요.");
+
 const signUpSchema = z.object({
   email: emailSchema,
-  password: z.string().min(8, "비밀번호는 8자 이상으로 입력해주세요."),
+  password: passwordSchema,
+  nickname: z.string().trim().min(1, "닉네임을 입력해주세요.").max(20, "닉네임은 20자 이내로 입력해주세요."),
+  name: z.string().trim().min(1, "이름을 입력해주세요.").max(30, "이름은 30자 이내로 입력해주세요."),
   carrier: z.enum(carrierTuple, { error: "이용 중인 통신사를 선택해주세요." }),
 });
 
@@ -26,13 +34,13 @@ const signInSchema = z.object({
 
 export interface AuthFormState {
   /** 필드별 검증 오류 (입력 칸 아래에 표시). */
-  fieldErrors?: { email?: string; password?: string; carrier?: string };
+  fieldErrors?: { email?: string; password?: string; nickname?: string; name?: string; carrier?: string };
   /** 폼 전체에 대한 오류 (Supabase 응답 등). */
   formError?: string;
   /** 이메일 인증이 필요해 아직 로그인되지 않은 상태. */
   emailConfirmationRequired?: boolean;
-  /** 입력값 유지용 — 오류로 폼이 다시 그려질 때 사용자가 다시 타이핑하지 않도록. */
-  values?: { email?: string; carrier?: string };
+  /** 입력값 유지용 — 오류로 폼이 다시 그려질 때 사용자가 다시 타이핑하지 않도록 (비밀번호는 제외). */
+  values?: { email?: string; nickname?: string; name?: string; carrier?: string };
 }
 
 /** 로그인 후 돌아갈 경로. 외부 도메인으로 튕기는 오픈 리다이렉트를 막기 위해 내부 절대경로만 허용한다. */
@@ -55,7 +63,7 @@ function translateAuthError(message: string): string {
     return "이미 가입된 이메일이에요. 로그인해주세요.";
   }
   if (normalized.includes("password")) {
-    return "비밀번호를 다시 확인해주세요. (8자 이상)";
+    return `비밀번호를 다시 확인해주세요. (${PASSWORD_MIN_LENGTH}자 이상 + 특수문자 포함)`;
   }
   if (normalized.includes("rate limit") || normalized.includes("too many")) {
     return "요청이 너무 많아요. 잠시 후 다시 시도해주세요.";
@@ -65,12 +73,16 @@ function translateAuthError(message: string): string {
 
 export async function signUpAction(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const rawEmail = String(formData.get("email") ?? "");
+  const rawNickname = String(formData.get("nickname") ?? "");
+  const rawName = String(formData.get("name") ?? "");
   const rawCarrier = String(formData.get("carrier") ?? "");
-  const keptValues = { email: rawEmail, carrier: rawCarrier };
+  const keptValues = { email: rawEmail, nickname: rawNickname, name: rawName, carrier: rawCarrier };
 
   const parsed = signUpSchema.safeParse({
     email: rawEmail,
     password: String(formData.get("password") ?? ""),
+    nickname: rawNickname,
+    name: rawName,
     carrier: rawCarrier,
   });
 
@@ -80,6 +92,8 @@ export async function signUpAction(_prevState: AuthFormState, formData: FormData
       fieldErrors: {
         email: fieldErrors.email?.[0],
         password: fieldErrors.password?.[0],
+        nickname: fieldErrors.nickname?.[0],
+        name: fieldErrors.name?.[0],
         carrier: fieldErrors.carrier?.[0],
       },
       values: keptValues,
@@ -87,12 +101,12 @@ export async function signUpAction(_prevState: AuthFormState, formData: FormData
   }
 
   const supabase = await createSupabaseAuthClient();
-  // options.data로 넘긴 carrier는 auth.users.raw_user_meta_data에 저장되고,
-  // 0006_create_profiles.sql의 트리거가 이를 읽어 profiles 행을 만든다.
+  // options.data로 넘긴 값들은 auth.users.raw_user_meta_data에 저장되고,
+  // 0008_add_profiles_nickname_name.sql의 트리거가 이를 읽어 profiles 행을 만든다.
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { carrier: parsed.data.carrier } },
+    options: { data: { carrier: parsed.data.carrier, nickname: parsed.data.nickname, name: parsed.data.name } },
   });
 
   if (error) {

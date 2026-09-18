@@ -1,9 +1,9 @@
 "use client";
 
-import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { nicknameFromEmail } from "./user";
+import { resolveNickname } from "./user";
 
 // 헤더처럼 모든 페이지에 깔리는 클라이언트 컴포넌트에서 로그인 상태를 읽기 위한 훅.
 //
@@ -20,9 +20,14 @@ export interface ClientAuthUser {
   nickname: string;
 }
 
-function toClientUser(user: User | null | undefined): ClientAuthUser | null {
+/** profiles.nickname을 조회해 붙인다. 실패해도 로그인 자체는 막지 않고 이메일 기반 호칭으로 대체한다. */
+async function loadClientUser(supabase: SupabaseClient, user: User | null | undefined): Promise<ClientAuthUser | null> {
   if (!user) return null;
-  return { id: user.id, email: user.email ?? null, nickname: nicknameFromEmail(user.email) };
+
+  const { data: profile, error } = await supabase.from("profiles").select("nickname").eq("id", user.id).maybeSingle();
+  if (error) console.error("[auth] failed to load profile nickname", error);
+
+  return { id: user.id, email: user.email ?? null, nickname: resolveNickname(profile?.nickname, user.email) };
 }
 
 export function useAuthUser(): { user: ClientAuthUser | null; loading: boolean } {
@@ -45,18 +50,21 @@ export function useAuthUser(): { user: ClientAuthUser | null; loading: boolean }
       };
     }
 
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      const clientUser = await loadClientUser(supabase, data.user);
       if (!active) return;
-      setUser(toClientUser(data.user));
+      setUser(clientUser);
       setLoading(false);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      setUser(toClientUser(session?.user));
-      setLoading(false);
+      loadClientUser(supabase, session?.user).then((clientUser) => {
+        if (!active) return;
+        setUser(clientUser);
+        setLoading(false);
+      });
     });
 
     return () => {

@@ -305,6 +305,8 @@ export async function POST(request: Request) {
         benefit_id: benefit.id,
         rank: index + 1,
         estimated_monthly_saving: benefit.estimated_monthly_saving,
+        // resultBenefits는 matchedBenefits와 같은 순서로 map한 배열이라 인덱스가 그대로 대응한다.
+        reason: resultBenefits[index]?.reason ?? null,
       })),
     );
     if (snapshotError) console.error("[diagnose] failed to store benefit snapshot", snapshotError);

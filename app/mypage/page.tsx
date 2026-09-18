@@ -1,4 +1,4 @@
-import { ArrowRight, Mail, Signal, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronRight, Mail, Signal, Sparkles, User } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import SiteFooter from "@/components/layout/SiteFooter";
@@ -6,85 +6,21 @@ import SiteHeader from "@/components/layout/SiteHeader";
 import SignOutButton from "@/components/mypage/SignOutButton";
 import { requireUser } from "@/lib/auth/session";
 import { CARRIER_LABELS } from "@/lib/carriers";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { loadDiagnosisHistory } from "@/lib/diagnosisHistory";
+import { formatDate } from "@/lib/formatDate";
 
 export const metadata: Metadata = {
   title: "마이페이지 | 티모산",
-  description: "가입 정보와 가장 최근 진단 결과를 확인해보세요.",
+  description: "가입 정보와 진단 이력을 확인해보세요.",
 };
 
 // 로그인 사용자별로 내용이 달라지므로 절대 캐싱하지 않는다.
 export const dynamic = "force-dynamic";
 
-interface LatestDiagnosis {
-  personaName: string;
-  totalMonthlySaving: number;
-  totalYearlySaving: number;
-  createdAt: string;
-}
-
-/**
- * 가장 최근 진단 결과 1건을 가져온다.
- *
- * diagnosis_* 테이블은 RLS deny-all이라(0001_init_schema.sql) anon 키로는 읽을 수 없다. 이 페이지는
- * requireUser()로 본인 확인을 먼저 끝냈으므로 service role 클라이언트로 조회하되, 반드시
- * diagnosis_sessions.user_id = 본인 id 조건을 걸어 남의 진단 이력이 섞이지 않게 한다.
- */
-async function loadLatestDiagnosis(userId: string): Promise<LatestDiagnosis | null> {
-  try {
-    const supabase = getSupabaseServerClient();
-
-    const { data: result, error } = await supabase
-      .from("diagnosis_results")
-      .select("id, created_at, personas!inner(name), diagnosis_sessions!inner(user_id)")
-      .eq("diagnosis_sessions.user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.error("[mypage] failed to load latest diagnosis", error);
-      return null;
-    }
-    if (!result) return null;
-
-    // 절감액은 진단 시점 스냅샷을 합산해둔 뷰에서 읽는다 (diagnosis_result_savings, 0001_init_schema.sql).
-    const { data: savings, error: savingsError } = await supabase
-      .from("diagnosis_result_savings")
-      .select("total_monthly_saving, total_yearly_saving")
-      .eq("diagnosis_result_id", result.id)
-      .maybeSingle();
-
-    if (savingsError) console.error("[mypage] failed to load savings", savingsError);
-
-    // to-one 임베드는 객체로 오지만, 생성된 DB 타입이 없어 추론이 배열로 잡히는 경우가 있어 둘 다 받는다.
-    const persona = result.personas as { name?: string } | { name?: string }[] | null;
-    const personaName = (Array.isArray(persona) ? persona[0]?.name : persona?.name) ?? "밸런스형";
-
-    return {
-      personaName,
-      totalMonthlySaving: savings?.total_monthly_saving ?? 0,
-      totalYearlySaving: savings?.total_yearly_saving ?? 0,
-      createdAt: result.created_at as string,
-    };
-  } catch (error) {
-    console.error("[mypage] unexpected error loading latest diagnosis", error);
-    return null;
-  }
-}
-
-function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "Asia/Seoul",
-  }).format(new Date(iso));
-}
-
 export default async function MyPage() {
   const user = await requireUser("/mypage");
-  const latestDiagnosis = await loadLatestDiagnosis(user.id);
+  const history = await loadDiagnosisHistory(user.id);
+  const latestDiagnosis = history[0] ?? null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-white dark:bg-zinc-950">
@@ -99,7 +35,7 @@ export default async function MyPage() {
             {user.nickname}님, 반가워요!
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-            가입 정보와 가장 최근 진단 결과를 확인할 수 있어요.
+            가입 정보와 지금까지의 진단 이력을 확인할 수 있어요.
           </p>
 
           {/* 로그인 정보 */}
@@ -107,6 +43,16 @@ export default async function MyPage() {
             <h2 className="text-sm font-bold text-zinc-700 dark:text-zinc-200">로그인 정보</h2>
 
             <dl className="mt-4 space-y-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-zinc-50 px-4 py-3.5 dark:bg-zinc-800/50">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
+                  <User className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <dt className="text-xs font-medium text-zinc-500 dark:text-zinc-400">닉네임</dt>
+                  <dd className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">{user.nickname}</dd>
+                </div>
+              </div>
+
               <div className="flex items-center gap-3 rounded-2xl bg-zinc-50 px-4 py-3.5 dark:bg-zinc-800/50">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
                   <Mail className="h-4 w-4" />
@@ -159,13 +105,22 @@ export default async function MyPage() {
                 <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
                   {formatDate(latestDiagnosis.createdAt)}에 진단했어요.
                 </p>
-                <Link
-                  href="/diagnosis/chat"
-                  className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-primary-700 hover:underline dark:text-primary-400"
-                >
-                  다시 진단하기
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <Link
+                    href={`/mypage/diagnosis/${latestDiagnosis.id}`}
+                    className="inline-flex items-center gap-1 text-sm font-bold text-primary-700 hover:underline dark:text-primary-400"
+                  >
+                    자세히 보기
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                  <Link
+                    href="/diagnosis/chat"
+                    className="inline-flex items-center gap-1 text-sm font-bold text-zinc-600 hover:underline dark:text-zinc-300"
+                  >
+                    다시 진단하기
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
               </>
             ) : (
               <div className="mt-4 rounded-2xl bg-zinc-50 px-4 py-8 text-center dark:bg-zinc-800/50">
@@ -180,6 +135,36 @@ export default async function MyPage() {
               </div>
             )}
           </section>
+
+          {/* 전체 진단 이력 — 여러 건이 쌓이면 각각 클릭해 상세로 이동할 수 있다. */}
+          {history.length > 0 && (
+            <section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900">
+              <h2 className="text-sm font-bold text-zinc-700 dark:text-zinc-200">전체 진단 이력</h2>
+              <ul className="mt-4 space-y-2">
+                {history.map((item) => (
+                  <li key={item.id}>
+                    <Link
+                      href={`/mypage/diagnosis/${item.id}`}
+                      className="flex items-center gap-3 rounded-2xl bg-zinc-50 px-4 py-3.5 transition hover:bg-primary-50 dark:bg-zinc-800/50 dark:hover:bg-primary-500/10"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
+                        <Sparkles className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                          {item.personaName}
+                        </p>
+                        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                          {formatDate(item.createdAt)} · 월 {item.totalMonthlySaving.toLocaleString()}원 절약
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <div className="mt-8">
             <SignOutButton />

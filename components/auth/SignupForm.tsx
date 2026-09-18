@@ -1,16 +1,33 @@
 "use client";
 
-import { MailCheck, UserPlus } from "lucide-react";
+import { Check, MailCheck, UserPlus, X } from "lucide-react";
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { signUpAction, type AuthFormState } from "@/app/actions/auth";
+import { checkPassword, isPasswordValid } from "@/lib/auth/password";
 import { CARRIER_LABELS, CARRIER_OPTIONS } from "@/lib/carriers";
 import TextField from "./TextField";
 
 const INITIAL_STATE: AuthFormState = {};
 
+/** 비밀번호 실시간 체크리스트 한 줄 — 조건 충족 여부에 따라 아이콘/색이 바뀐다. */
+function PasswordRule({ met, label }: { met: boolean; label: string }) {
+  return (
+    <li
+      className={`flex items-center gap-1.5 ${met ? "text-primary-600 dark:text-primary-400" : "text-zinc-400 dark:text-zinc-500"}`}
+    >
+      {met ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+      {label}
+    </li>
+  );
+}
+
 export default function SignupForm({ nextPath }: { nextPath: string }) {
   const [state, action, pending] = useActionState(signUpAction, INITIAL_STATE);
+  // 비밀번호는 state.values로 되돌려받지 않는다(서버가 절대 echo하지 않음) — 항상 빈 값에서 시작한다.
+  const [password, setPassword] = useState("");
+  const passwordChecks = checkPassword(password);
+  const passwordValid = isPasswordValid(password);
 
   // 이메일 인증이 켜진 프로젝트에서는 가입 직후 세션이 없다 — 폼 대신 안내 화면을 보여준다.
   if (state.emailConfirmationRequired) {
@@ -50,15 +67,46 @@ export default function SignupForm({ nextPath }: { nextPath: string }) {
       />
 
       <TextField
+        id="signup-nickname"
+        name="nickname"
+        type="text"
+        label="닉네임"
+        placeholder="화면에 표시될 닉네임"
+        autoComplete="nickname"
+        maxLength={20}
+        defaultValue={state.values?.nickname}
+        error={state.fieldErrors?.nickname}
+        hint="헤더와 마이페이지에 이 닉네임으로 표시돼요."
+      />
+
+      <TextField
+        id="signup-name"
+        name="name"
+        type="text"
+        label="이름"
+        placeholder="실명을 입력해주세요"
+        autoComplete="name"
+        maxLength={30}
+        defaultValue={state.values?.name}
+        error={state.fieldErrors?.name}
+      />
+
+      <TextField
         id="signup-password"
         name="password"
         type="password"
         label="비밀번호"
-        placeholder="8자 이상 입력해주세요"
+        placeholder="8자 이상 + 특수문자 포함"
         autoComplete="new-password"
+        value={password}
+        onChange={setPassword}
         error={state.fieldErrors?.password}
-        hint="8자 이상으로 설정해주세요."
-      />
+      >
+        <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium">
+          <PasswordRule met={passwordChecks.length} label="8자 이상" />
+          <PasswordRule met={passwordChecks.specialChar} label="특수문자 1개 이상" />
+        </ul>
+      </TextField>
 
       <fieldset>
         <legend className="text-sm font-bold text-zinc-700 dark:text-zinc-200">이용 중인 통신사</legend>
@@ -98,7 +146,7 @@ export default function SignupForm({ nextPath }: { nextPath: string }) {
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || !passwordValid}
         className="flex h-12 w-full items-center justify-center gap-1.5 rounded-full bg-primary-700 text-sm font-bold text-white transition-colors hover:bg-primary-800 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:disabled:bg-zinc-700"
       >
         {pending ? (
