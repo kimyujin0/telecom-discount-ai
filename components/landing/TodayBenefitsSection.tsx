@@ -36,7 +36,9 @@ export default function TodayBenefitsSection() {
               오늘 받을 수 있는 할인
             </h2>
             <p className="mt-3 text-base text-zinc-500 dark:text-zinc-400">
-              로그인하면, 오늘 바로 사용할 수 있는 맞춤 혜택을 알려드려요
+              {isLoggedIn
+                ? "마이페이지에서 내 통신사 혜택과 진단 결과를 바로 확인해보세요"
+                : "로그인하면, 오늘 바로 사용할 수 있는 맞춤 혜택을 알려드려요"}
             </p>
             <Link
               href={isLoggedIn ? "/mypage" : "/login"}
