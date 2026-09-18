@@ -1,6 +1,5 @@
-import { ArrowRight, ChevronRight, Coins, MessageCircleHeart, UserCheck } from "lucide-react";
+import { ChevronRight, Coins, MessageCircleHeart, UserCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import Link from "next/link";
 
 const HIGHLIGHT_ITEMS: { icon: LucideIcon; title: string; description: string }[] = [
   {
@@ -44,16 +43,6 @@ export default function WhyGoodSection() {
             )}
           </div>
         ))}
-      </div>
-
-      <div className="mt-10 flex justify-center">
-        <Link
-          href="/diagnosis/chat"
-          className="inline-flex items-center justify-center gap-2 rounded-full bg-primary-700 px-8 py-4 text-base font-bold text-white shadow-lg shadow-primary-900/15 transition hover:bg-primary-800 active:scale-[0.98]"
-        >
-          지금 맞춤 혜택 진단하러가기
-          <ArrowRight className="h-4.5 w-4.5" />
-        </Link>
       </div>
     </section>
   );

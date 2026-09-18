@@ -1,4 +1,5 @@
-import { ArrowLeft, Bot, Check, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Check, Sparkles, X } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 // 5단계 설명 섹션 — 실제로 동작하지 않는 정적 스마트폰 화면 목업이다(혜택진단2.png 참고).
@@ -233,6 +234,18 @@ export default function HowItWorksSteps() {
               </div>
             );
           })}
+        </div>
+
+        {/* 페이지 전체의 마지막 CTA — 원래 WhyGoodSection 하단에 있었지만, 5단계 설명까지 다 본 뒤
+            누르도록 페이지 최하단으로 옮겼다. */}
+        <div className="mt-10 flex justify-center">
+          <Link
+            href="/diagnosis/chat"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary-700 px-8 py-4 text-base font-bold text-white shadow-lg shadow-primary-900/15 transition hover:bg-primary-800 active:scale-[0.98]"
+          >
+            지금 맞춤 혜택 진단하러가기
+            <ArrowRight className="h-4.5 w-4.5" />
+          </Link>
         </div>
       </div>
     </section>
