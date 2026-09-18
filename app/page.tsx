@@ -1,5 +1,4 @@
 import HeroSection from "@/components/landing/HeroSection";
-import PersonaCarouselSection from "@/components/landing/PersonaCarouselSection";
 import ProblemSection from "@/components/landing/ProblemSection";
 import TodayBenefitsSection from "@/components/landing/TodayBenefitsSection";
 import WhyUsSection from "@/components/landing/WhyUsSection";
@@ -14,7 +13,6 @@ export default function Home() {
         <HeroSection />
         <ProblemSection />
         <TodayBenefitsSection />
-        <PersonaCarouselSection />
         <WhyUsSection />
       </main>
       <SiteFooter />
