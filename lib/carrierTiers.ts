@@ -35,6 +35,21 @@ export function tierMatches(benefitTier: string | null | undefined, selectedTier
 }
 
 /**
+ * 화면에 보여줄 등급 표기. benefits.tier에는 "전체" 대신 6개 등급을 전부 나열해 저장한 행도 있어서
+ * ("VVIP,VIP,GOLD,SILVER,WHITE,일반"), 그 통신사의 모든 등급에 해당하면 "전체 등급"으로 줄여 보여준다.
+ * 일부 등급이면 구분자를 "·"로 통일한다 ("VIP,VVIP" -> "VIP·VVIP").
+ */
+export function formatTierLabel(carrier: string, tier: string | null | undefined): string {
+  if (!tier || tier === "전체") return "전체 등급";
+  if (isTieredCarrier(carrier) && CARRIER_TIERS[carrier].every((t) => tierMatches(tier, t))) return "전체 등급";
+  return tier
+    .split(/[,·/]/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .join("·");
+}
+
+/**
  * 사용자가 자기 등급을 모를 때 쓰는 값. 진단 대화에서 "모름"이라고 답하면 등급 조건을 걸지 않고
  * 등급 무관 혜택까지 모두 추천한다. diagnosis_sessions.tier에도 이 값이 그대로 저장된다
  * (0007_add_diagnosis_sessions_tier.sql).

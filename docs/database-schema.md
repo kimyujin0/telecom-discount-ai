@@ -112,6 +112,18 @@ diagnosis_sessions ──1:N──► diagnosis_messages (턴 기반 채팅 로�
 | `is_active` | boolean | 기본 true |
 | `created_at` / `updated_at` | timestamptz | |
 
+#### KT 등급별 혜택 구조 (`source_url = 'carrier-page-seed'`)
+
+KT는 "전 등급 공통 상시혜택" + "VIP·VVIP 전용 초이스 혜택" 구조로 운영된다. `benefits.tier`에 그 범위를 명시해 저장한다:
+
+| 범위 | `tier` 값 | 행 수 |
+| --- | --- | --- |
+| 전 등급 공통 | `VVIP,VIP,GOLD,SILVER,WHITE,일반` | 13 (오굿모닝, 달달초이스 9종, QED 골프아카데미, 어바웃펫, 공차) |
+| VIP 이상 | `VIP,VVIP` | 5 (VIP초이스 3종, 플레이타임 키즈카페, 백야드 골프) |
+| VVIP 전용 | `VVIP` | 3 (VVIP초이스-밀리의서재, 플레이타임 월 1회 완전무료, 롯데시네마 생일 무료영화 3매) |
+
+등급별로 보이는 혜택 수는 VVIP 21 > VIP 18 > GOLD/SILVER/WHITE/일반 13이다. GOLD·SILVER·WHITE·일반에만 해당하는 혜택은 없어서 이 네 등급은 전 등급 공통 혜택과 같다. "택1" 묶음(달달초이스/VIP초이스/VVIP초이스)은 항목을 각각 별도 행으로 두고 `usage_condition`에 "택1"을 적는다. 이 데이터는 `scripts/rebuild-kt-benefits.mjs`(멱등, `--dry-run` 지원)로 만든다 — 기존 행은 지우지 않고 같은 id로 제자리 수정한다(`saved_benefits`/`diagnosis_result_benefits`가 id를 참조). 대응이 없는 옛 행(CGV·메가박스)은 `is_active=false`로 내렸다. `estimated_monthly_saving`에는 금액을 알 수 없어 넣은 추정값이 있으며 스크립트 주석에 표시돼 있다. 화면에서는 6개 등급을 다 나열한 값을 `formatTierLabel()`이 "전체 등급"으로 줄여 보여준다.
+
 ### 6. `persona_benefits` — 페르소나 ↔ 혜택 매핑 (N:M)
 
 혜택 매칭 로직의 기준 테이블. `weight`가 높을수록 해당 페르소나에게 우선 추천.

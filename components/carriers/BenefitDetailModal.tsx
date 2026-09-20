@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { useEffect } from "react";
+import { formatTierLabel } from "@/lib/carrierTiers";
 import { formatDiscount, formatValidTo } from "@/lib/formatBenefit";
 import type { BenefitCatalogItem } from "./types";
 
@@ -39,7 +40,7 @@ export default function BenefitDetailModal({
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-xs font-semibold text-primary-600 dark:text-primary-400">
-              {item.provider} · {item.tier ?? "전체 등급"}
+              {item.provider} · {formatTierLabel(item.carrier, item.tier)}
             </p>
             <h3 className="mt-1 text-lg font-extrabold text-zinc-900 dark:text-zinc-50">{item.title}</h3>
           </div>
