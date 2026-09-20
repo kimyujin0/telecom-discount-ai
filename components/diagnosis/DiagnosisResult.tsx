@@ -1,10 +1,10 @@
 "use client";
 
-import { ChevronDown, PartyPopper, RefreshCcw } from "lucide-react";
+import { BellRing, ChevronDown, PartyPopper, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import SaveBenefitButton from "@/components/saved/SaveBenefitButton";
-import { buildLoginPathForDiagnosis } from "@/lib/diagnosis/resume";
+import { buildLoginPathForDiagnosis, buildLoginPathForSavingResult } from "@/lib/diagnosis/resume";
 import { useSavedBenefits } from "@/lib/saved/useSavedBenefits";
 
 export interface DiagnosisResultBenefit {
@@ -40,6 +40,9 @@ export default function DiagnosisResult({
   // 비로그인 상태에서 저장을 누르면 이 결과의 세션 id를 next로 실어 로그인 페이지로 보낸다.
   // 로그인하면 /diagnosis/chat?session=<id> 로 돌아와 재진단 없이 같은 결과가 다시 보인다.
   const loginHref = sessionId ? buildLoginPathForDiagnosis(sessionId) : undefined;
+  // 비로그인으로 진단을 마친 사용자에게만 하단 "결과 저장하고 알림받기"를 보여준다.
+  // 로그인/저장 목록 확인이 끝나기 전에는 숨겨서, 로그인 사용자에게 잠깐 보였다 사라지는 깜빡임을 막는다.
+  const showSaveCta = !saver.loading && !saver.loggedIn;
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
@@ -126,10 +129,25 @@ export default function DiagnosisResult({
         </div>
       )}
 
+      {showSaveCta && (
+        <div className="mt-6">
+          <Link
+            href={buildLoginPathForSavingResult(sessionId)}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary-700 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary-900/15 transition hover:bg-primary-800 active:scale-[0.98]"
+          >
+            <BellRing className="h-4 w-4" />
+            결과 저장하고 알림받기
+          </Link>
+          <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
+            로그인하면 이 진단 결과가 내 계정에 저장돼요.
+          </p>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={onRestart}
-        className="mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-zinc-300 py-2.5 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        className={`${showSaveCta ? "mt-3" : "mt-6"} inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-zinc-300 py-2.5 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800`}
       >
         <RefreshCcw className="h-3.5 w-3.5" />
         다시 진단하기

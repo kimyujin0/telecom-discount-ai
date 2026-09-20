@@ -11,7 +11,7 @@ import TextField from "./TextField";
 
 const INITIAL_STATE: AuthFormState = {};
 
-export default function SignupForm({ nextPath }: { nextPath: string }) {
+export default function SignupForm({ nextPath, claimSessionId = null }: { nextPath: string; claimSessionId?: string | null }) {
   const [state, action, pending] = useActionState(signUpAction, INITIAL_STATE);
   // 비밀번호는 state.values로 되돌려받지 않는다(서버가 절대 echo하지 않음) — 항상 빈 값에서 시작한다.
   const [password, setPassword] = useState("");
@@ -43,6 +43,7 @@ export default function SignupForm({ nextPath }: { nextPath: string }) {
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="next" value={nextPath} />
+      {claimSessionId && <input type="hidden" name="claim" value={claimSessionId} />}
 
       <TextField
         id="signup-email"

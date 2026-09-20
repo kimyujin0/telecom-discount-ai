@@ -7,6 +7,8 @@
 
 import type { DiagnosisResultData } from "@/components/diagnosis/DiagnosisResult";
 
+import { buildAuthSearch, DEFAULT_NEXT_PATH } from "@/lib/auth/nextPath";
+
 export const DIAGNOSIS_CHAT_PATH = "/diagnosis/chat";
 
 /** 저장돼 있던 진단 결과를 그대로 다시 보여주기 위해 서버가 화면에 넘기는 값. */
@@ -29,6 +31,15 @@ export function buildDiagnosisResumePath(sessionId: string): string {
 /** 이 결과 화면으로 돌아오도록 `next`를 실어 보내는 로그인 경로. */
 export function buildLoginPathForDiagnosis(sessionId: string): string {
   return `/login?next=${encodeURIComponent(buildDiagnosisResumePath(sessionId))}`;
+}
+
+/**
+ * "결과 저장하고 알림받기" 버튼의 로그인 경로 — 로그인/가입이 끝나면 마이페이지로 가고(next),
+ * 방금 본 비로그인 진단은 그 계정으로 연결(claim)된다. 결과 화면으로 되돌아오는 buildLoginPathForDiagnosis와 달리
+ * 목적지 주소에 세션을 싣지 않으므로 claim 파라미터로 따로 넘긴다.
+ */
+export function buildLoginPathForSavingResult(sessionId: string | null): string {
+  return `/login${buildAuthSearch(DEFAULT_NEXT_PATH, sessionId)}`;
 }
 
 /**

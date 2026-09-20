@@ -7,7 +7,7 @@ import { safeNextPath } from "@/lib/auth/nextPath";
 import { PASSWORD_MIN_LENGTH, PASSWORD_SPECIAL_CHAR_REGEX } from "@/lib/auth/password";
 import { CARRIERS } from "@/lib/carriers";
 import { claimAnonymousSession } from "@/lib/diagnosis/claimSession";
-import { parseResumeSessionId } from "@/lib/diagnosis/resume";
+import { isUuid, parseResumeSessionId } from "@/lib/diagnosis/resume";
 import { createSupabaseAuthClient } from "@/lib/supabase/auth";
 
 // 로그인/회원가입/로그아웃 서버 액션.
@@ -47,13 +47,16 @@ export interface AuthFormState {
 }
 
 /**
- * 로그인/회원가입에 성공한 직후, `next`가 "진단 결과 복귀" 경로(/diagnosis/chat?session=...)면 그 비로그인 진단을
- * 방금 인증된 사용자의 것으로 연결한다. 그래야 결과 화면으로 돌아왔을 때 이 진단이 마이페이지 이력에도 남는다.
+ * 로그인/회원가입에 성공한 직후, 그 전에 비로그인으로 진행한 진단을 방금 인증된 사용자의 것으로 연결한다.
+ * 그래야 이 진단이 마이페이지 이력에 남는다. 연결할 세션은 두 경로 중 하나로 들어온다:
+ *   - `claim` 폼 값: "결과 저장하고 알림받기" 버튼 — 목적지는 /mypage, 연결할 세션은 여기로 따로 넘어옴
+ *   - `next`가 /diagnosis/chat?session=... : 별(저장) 버튼 — 로그인 후 그 결과 화면으로 돌아옴
  * 실패해도 로그인 자체는 성공으로 두므로 예외를 던지지 않는다(claimAnonymousSession은 false만 돌려준다).
  */
-async function claimResumedDiagnosis(userId: string | undefined, nextPath: string): Promise<void> {
+async function claimAnonymousDiagnosis(userId: string | undefined, formData: FormData, nextPath: string): Promise<void> {
   if (!userId) return;
-  const sessionId = parseResumeSessionId(nextPath);
+  const claim = formData.get("claim");
+  const sessionId = isUuid(claim) ? claim : parseResumeSessionId(nextPath);
   if (sessionId) await claimAnonymousSession(userId, sessionId);
 }
 
@@ -127,7 +130,7 @@ export async function signUpAction(_prevState: AuthFormState, formData: FormData
   }
 
   const nextPath = safeNextPath(formData.get("next"));
-  await claimResumedDiagnosis(data.user?.id, nextPath);
+  await claimAnonymousDiagnosis(data.user?.id, formData, nextPath);
 
   revalidatePath("/", "layout");
   redirect(nextPath);
@@ -160,7 +163,7 @@ export async function signInAction(_prevState: AuthFormState, formData: FormData
   }
 
   const nextPath = safeNextPath(formData.get("next"));
-  await claimResumedDiagnosis(data.user?.id, nextPath);
+  await claimAnonymousDiagnosis(data.user?.id, formData, nextPath);
 
   revalidatePath("/", "layout");
   redirect(nextPath);

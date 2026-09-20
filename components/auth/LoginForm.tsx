@@ -7,12 +7,13 @@ import TextField from "./TextField";
 
 const INITIAL_STATE: AuthFormState = {};
 
-export default function LoginForm({ nextPath }: { nextPath: string }) {
+export default function LoginForm({ nextPath, claimSessionId = null }: { nextPath: string; claimSessionId?: string | null }) {
   const [state, action, pending] = useActionState(signInAction, INITIAL_STATE);
 
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="next" value={nextPath} />
+      {claimSessionId && <input type="hidden" name="claim" value={claimSessionId} />}
 
       <TextField
         id="login-email"

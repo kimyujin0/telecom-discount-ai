@@ -6,6 +6,20 @@
 
 export const DEFAULT_NEXT_PATH = "/mypage";
 
+/**
+ * /login, /signup 주소의 쿼리스트링(`?next=...&claim=...`). 둘 다 없으면 빈 문자열.
+ *   - next  : 인증 후 돌아갈 내부 경로
+ *   - claim : 인증에 성공하면 그 계정으로 연결(claim)할 비로그인 진단 세션 id
+ * 로그인 <-> 회원가입 전환 링크가 이 둘을 계속 들고 다니게 하는 데 쓴다.
+ */
+export function buildAuthSearch(nextPath: string | null, claimSessionId: string | null): string {
+  const params = new URLSearchParams();
+  if (nextPath) params.set("next", nextPath);
+  if (claimSessionId) params.set("claim", claimSessionId);
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
 export function safeNextPath(raw: unknown): string {
   if (typeof raw !== "string") return DEFAULT_NEXT_PATH;
   // "//evil.com"(프로토콜 상대 URL)과 "/\evil.com"(브라우저가 //로 해석) 모두 외부로 나가는 경로다.
