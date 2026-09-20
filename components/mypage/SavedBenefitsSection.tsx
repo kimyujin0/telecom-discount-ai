@@ -6,10 +6,11 @@ import { formatDiscount, formatValidTo, resolveCategoryLabel } from "@/lib/forma
 import type { SavedBenefitItem } from "@/lib/savedBenefits";
 import UnsaveButton from "./UnsaveButton";
 
-// D-day 배지 색: D-7 이상/상시/마감은 회색, D-3~D-6 노란색, D-2 이하(당일 포함) 빨간색.
+// D-day 배지 색: D-7 이상/상시/조건부 상시/마감은 회색, D-3~D-6 노란색, D-2 이하(당일 포함) 빨간색.
 const BADGE_STYLES: Record<DdayTone, string> = {
   safe: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
   none: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+  conditional: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
   expired: "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500",
   warning: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
   danger: "bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400",
@@ -51,7 +52,9 @@ export default function SavedBenefitsSection({ userId, items }: { userId: string
       ) : (
         <ul className="mt-4 space-y-3" data-testid="saved-benefits-list">
           {sorted.map((item) => {
-            const dday = getDdayInfo(item.validTo, today);
+            // 공백뿐인 조건은 배지(getDdayInfo)와 같은 기준으로 "없음" 취급해 빈 "이용 조건 ·" 줄이 남지 않게 한다.
+            const usageCondition = item.usageCondition?.trim() || null;
+            const dday = getDdayInfo(item.validTo, today, usageCondition);
             const carrierLabel = isCarrierKey(item.carrier) ? CARRIER_LABELS[item.carrier] : item.carrier;
             const categoryLabel = resolveCategoryLabel(item.category);
             const validToLabel = formatValidTo(item.validTo);
@@ -100,10 +103,10 @@ export default function SavedBenefitsSection({ userId, items }: { userId: string
                 {item.description && (
                   <p className="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{item.description}</p>
                 )}
-                {item.usageCondition && (
+                {usageCondition && (
                   <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                     <span className="font-semibold text-zinc-700 dark:text-zinc-200">이용 조건</span> ·{" "}
-                    {item.usageCondition}
+                    {usageCondition}
                   </p>
                 )}
 

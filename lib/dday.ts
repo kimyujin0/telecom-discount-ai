@@ -7,8 +7,13 @@
 export type DdayTone =
   /** 마감일이 지남 — 회색 "마감" */
   | "expired"
-  /** 마감일 없는 상시 혜택 — 회색 "상시" */
+  /** 마감일도 이용 조건도 없는 진짜 상시 혜택 — 회색 "상시" */
   | "none"
+  /**
+   * 마감일은 없지만 이용 조건(아침 5~9시, 1일 1회 등)이 있는 혜택 — 회색 "조건부 상시".
+   * 그냥 "상시"로 두면 조건 없이 언제나 쓸 수 있는 것처럼 오해하기 쉬워서 따로 나눈다.
+   */
+  | "conditional"
   /** D-7 이상 — 회색 */
   | "safe"
   /** D-3 ~ D-6 — 노란색 */
@@ -49,8 +54,14 @@ export function daysUntil(validTo: string, today: string): number {
   return toUtcDayNumber(validTo) - toUtcDayNumber(today);
 }
 
-export function getDdayInfo(validTo: string | null, today: string): DdayInfo {
-  if (!validTo) return { days: null, label: "상시", tone: "none", urgent: false };
+export function getDdayInfo(validTo: string | null, today: string, usageCondition?: string | null): DdayInfo {
+  if (!validTo) {
+    // 공백만 있는 조건은 없는 것으로 본다.
+    const hasCondition = !!usageCondition?.trim();
+    return hasCondition
+      ? { days: null, label: "조건부 상시", tone: "conditional", urgent: false }
+      : { days: null, label: "상시", tone: "none", urgent: false };
+  }
 
   const days = daysUntil(validTo, today);
   if (days < 0) return { days, label: "마감", tone: "expired", urgent: false };
