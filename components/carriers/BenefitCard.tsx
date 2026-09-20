@@ -1,14 +1,18 @@
 import { ChevronRight, Tag } from "lucide-react";
+import SaveBenefitButton from "@/components/saved/SaveBenefitButton";
 import { BENEFIT_CATEGORY_ICONS } from "@/lib/carrierBenefitCategories";
 import { formatDiscount } from "@/lib/formatBenefit";
+import type { SavedBenefitsApi } from "@/lib/saved/useSavedBenefits";
 import type { BenefitCatalogItem } from "./types";
 
 export default function BenefitCard({
   item,
   onOpenDetail,
+  saver,
 }: {
   item: BenefitCatalogItem;
   onOpenDetail: (item: BenefitCatalogItem) => void;
+  saver: SavedBenefitsApi;
 }) {
   const Icon = item.category ? BENEFIT_CATEGORY_ICONS[item.category] : Tag;
 
@@ -23,6 +27,7 @@ export default function BenefitCard({
             {item.category}
           </span>
         )}
+        <SaveBenefitButton benefitId={item.id} saver={saver} className="ml-auto" />
       </div>
 
       <h3 className="mt-3 text-base font-bold text-zinc-900 dark:text-zinc-50">{item.title}</h3>

@@ -3,6 +3,8 @@
 import { ChevronDown, PartyPopper, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import SaveBenefitButton from "@/components/saved/SaveBenefitButton";
+import { useSavedBenefits } from "@/lib/saved/useSavedBenefits";
 
 export interface DiagnosisResultBenefit {
   id: string;
@@ -29,6 +31,7 @@ export default function DiagnosisResult({
   onRestart: () => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(result.benefits[0]?.id ?? null);
+  const saver = useSavedBenefits();
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
@@ -70,26 +73,31 @@ export default function DiagnosisResult({
                 key={benefit.id}
                 className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <button
-                  type="button"
-                  onClick={() => setExpandedId(isExpanded ? null : benefit.id)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">
-                      <span className="mr-1.5 rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                        {benefit.provider}
-                      </span>
-                      {benefit.title}
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold text-primary-600 dark:text-primary-400">
-                      월 {benefit.estimatedMonthlySaving.toLocaleString()}원 절약
-                    </p>
-                  </div>
-                  <ChevronDown
-                    className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                  />
-                </button>
+                {/* 저장 버튼은 <button> 안에 중첩할 수 없어서, 펼치기 버튼과 나란히 두는 형제 요소로 뺐다. */}
+                <div className="flex items-center gap-1 pr-2">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(isExpanded ? null : benefit.id)}
+                    aria-expanded={isExpanded}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 py-3.5 pl-4 text-left"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                        <span className="mr-1.5 rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                          {benefit.provider}
+                        </span>
+                        {benefit.title}
+                      </p>
+                      <p className="mt-0.5 text-xs font-semibold text-primary-600 dark:text-primary-400">
+                        월 {benefit.estimatedMonthlySaving.toLocaleString()}원 절약
+                      </p>
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  <SaveBenefitButton benefitId={benefit.id} saver={saver} />
+                </div>
 
                 {isExpanded && (
                   <div className="border-t border-zinc-100 px-4 py-3.5 dark:border-zinc-800">

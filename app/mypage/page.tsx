@@ -5,11 +5,13 @@ import SiteFooter from "@/components/layout/SiteFooter";
 import SiteHeader from "@/components/layout/SiteHeader";
 import ChangePasswordForm from "@/components/mypage/ChangePasswordForm";
 import EditNicknameForm from "@/components/mypage/EditNicknameForm";
+import SavedBenefitsSection from "@/components/mypage/SavedBenefitsSection";
 import SignOutButton from "@/components/mypage/SignOutButton";
 import { requireUser } from "@/lib/auth/session";
 import { CARRIER_LABELS } from "@/lib/carriers";
 import { loadDiagnosisHistory } from "@/lib/diagnosisHistory";
 import { formatDate } from "@/lib/formatDate";
+import { loadSavedBenefits } from "@/lib/savedBenefits";
 
 export const metadata: Metadata = {
   title: "마이페이지 | 티모산",
@@ -21,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MyPage() {
   const user = await requireUser("/mypage");
-  const history = await loadDiagnosisHistory(user.id);
+  const [history, savedBenefits] = await Promise.all([loadDiagnosisHistory(user.id), loadSavedBenefits(user.id)]);
   const latestDiagnosis = history[0] ?? null;
 
   return (
@@ -86,6 +88,9 @@ export default async function MyPage() {
               </div>
             </dl>
           </section>
+
+          {/* 저장한 혜택 (마감 임박순 정렬 + D-day 배지) */}
+          <SavedBenefitsSection userId={user.id} items={savedBenefits} />
 
           {/* 비밀번호 변경 */}
           <section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900">

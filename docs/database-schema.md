@@ -8,7 +8,9 @@
 auth.users (Supabase Auth)
    │ 1:1
    ▼
-profiles (가입 시 선택한 이용 통신사)
+profiles (가입 시 선택한 이용 통신사, 닉네임/이름)
+   │
+   └─N:M──► benefits  (saved_benefits: 마이페이지 "저장한 혜택")
 
 personas (6종 고정)
    │ 1:N
@@ -163,11 +165,24 @@ Supabase Auth의 `auth.users`에는 서비스 고유 컬럼을 추가할 수 없
 
 용도: `/mypage`의 가입 정보 표시, 진단 대화에서 "OO님은 SKT를 이용 중이시죠?" 확인 (`app/api/diagnose`).
 
+### 10. `saved_benefits` — 저장한 혜택 (마이페이지 "저장한 혜택")
+
+진단 결과 화면과 `/carriers` 혜택 카드의 별(★) 버튼이 만드는 사용자 ↔ 혜택 N:M 테이블.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| `user_id` | uuid (PK, FK → auth.users, cascade delete) | 저장한 사용자 |
+| `benefit_id` | uuid (PK, FK → benefits, cascade delete) | 저장한 혜택 |
+| `created_at` | timestamptz | 저장 시각 (저장함 정렬용) |
+
+`(user_id, benefit_id)`가 PK라 같은 혜택은 한 번만 저장된다. 마감일은 복사해두지 않고 `benefits.valid_to`를 조인해서 읽는다 — D-day 배지 계산은 `lib/dday.ts`.
+
 ## 접근 제어 (RLS) 방침
 
 - 모든 테이블 RLS 활성화
 - `personas`, `benefits`, `persona_benefits`(카탈로그성 데이터)는 `anon` 역할에 **읽기 전용** 허용
 - `profiles`는 **본인 행만** 읽기/수정 허용(`auth.uid() = id`). INSERT 정책은 두지 않는다 — 행 생성은 위 트리거만 담당한다.
+- `saved_benefits`는 **본인 행만** select/insert/delete 허용(`auth.uid() = user_id`), update 정책은 없다. 브라우저(anon 키 + 로그인 세션)가 RLS로 직접 읽고 쓴다.
 - `diagnosis_sessions` / `diagnosis_messages` / `diagnosis_results` / `diagnosis_result_benefits` / `kakao_send_logs`는 클라이언트가 직접 접근하지 않고, **`app/api/` 라우트 핸들러가 Supabase service role 키로만 접근** (서버에서 세션 소유권 검증 후 처리) — RLS는 anon/authenticated에 대해 기본 차단(deny-all)으로 둔다.
 
 ## 마이그레이션 파일
@@ -183,3 +198,6 @@ Supabase Auth의 `auth.users`에는 서비스 고유 컬럼을 추가할 수 없
 | [`0005_nullable_benefits_persona_category.sql`](../supabase/migrations/0005_nullable_benefits_persona_category.sql) | `benefits.persona_category` NOT NULL 해제 |
 | [`0006_create_profiles.sql`](../supabase/migrations/0006_create_profiles.sql) | `profiles` 테이블 + `auth.users` 트리거 + RLS |
 | [`0007_add_diagnosis_sessions_tier.sql`](../supabase/migrations/0007_add_diagnosis_sessions_tier.sql) | `diagnosis_sessions.tier` |
+| [`0008_add_profiles_nickname_name.sql`](../supabase/migrations/0008_add_profiles_nickname_name.sql) | `profiles.nickname` / `name` + 가입 트리거 갱신 |
+| [`0009_add_diagnosis_result_benefits_reason.sql`](../supabase/migrations/0009_add_diagnosis_result_benefits_reason.sql) | `diagnosis_result_benefits.reason` (진단 시점 추천 이유 스냅샷) |
+| [`0010_create_saved_benefits.sql`](../supabase/migrations/0010_create_saved_benefits.sql) | `saved_benefits` 테이블 + 본인 행 전용 RLS |

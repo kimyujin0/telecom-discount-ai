@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { filterBenefits } from "@/lib/carrierBenefitFilter";
 import type { BenefitCategory } from "@/lib/carrierBenefitCategories";
 import { CARRIER_TIERS, isTieredCarrier, type TieredCarrierKey } from "@/lib/carrierTiers";
+import { useSavedBenefits } from "@/lib/saved/useSavedBenefits";
 import BenefitCard from "./BenefitCard";
 import BenefitDetailModal from "./BenefitDetailModal";
 import CarrierTabs from "./CarrierTabs";
@@ -25,6 +26,8 @@ export default function CarrierBenefitsBoard({
   const [tier, setTier] = useState<string>(CARRIER_TIERS[initialCarrier][0]);
   const [categories, setCategories] = useState<BenefitCategory[]>([]);
   const [detailItem, setDetailItem] = useState<BenefitCatalogItem | null>(initialDetailItem);
+  // 저장 여부는 카드마다 조회하지 않고 여기서 한 번만 읽어 아래로 내려준다.
+  const saver = useSavedBenefits();
 
   const handleCarrierChange = (next: TieredCarrierKey) => {
     setCarrier(next);
@@ -86,7 +89,7 @@ export default function CarrierBenefitsBoard({
           ) : (
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {filtered.map((item) => (
-                <BenefitCard key={item.id} item={item} onOpenDetail={setDetailItem} />
+                <BenefitCard key={item.id} item={item} onOpenDetail={setDetailItem} saver={saver} />
               ))}
             </div>
           )}
