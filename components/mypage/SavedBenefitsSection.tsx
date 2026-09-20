@@ -6,11 +6,14 @@ import { formatDiscount, formatValidTo, resolveCategoryLabel } from "@/lib/forma
 import type { SavedBenefitItem } from "@/lib/savedBenefits";
 import UnsaveButton from "./UnsaveButton";
 
-// D-day 배지 색: D-7 이상/상시/조건부 상시/마감은 회색, D-3~D-6 노란색, D-2 이하(당일 포함) 빨간색.
+// 배지 색: 오늘 사용 가능은 초록, 임박(빨강)·곧(노랑)·그 외(회색). 마감일 기준과 월간(이번 달 말일) 기준의 색 경계는
+// lib/dday.ts에서 각각 정한다 — 여기서는 단계별 색만 맞춘다.
 const BADGE_STYLES: Record<DdayTone, string> = {
   safe: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
   none: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
   conditional: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+  upcoming: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+  available: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
   expired: "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500",
   warning: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
   danger: "bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400",
@@ -21,7 +24,7 @@ export default function SavedBenefitsSection({ userId, items }: { userId: string
   // 마이페이지가 force-dynamic이라 요청마다 오늘 날짜를 새로 계산한다.
   const today = todayInSeoul();
   const sorted = sortByUrgency(items, today);
-  const urgentCount = sorted.filter((item) => getDdayInfo(item.validTo, today).urgent).length;
+  const urgentCount = sorted.filter((item) => getDdayInfo(item.validTo, today, item.usageCondition).urgent).length;
 
   return (
     <section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900">
@@ -91,7 +94,8 @@ export default function SavedBenefitsSection({ userId, items }: { userId: string
                     <span
                       data-testid="dday-badge"
                       data-tone={dday.tone}
-                      className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${BADGE_STYLES[dday.tone]}`}
+                      data-kind={dday.kind}
+                      className={`rounded-full px-2.5 py-1 text-xs font-extrabold whitespace-nowrap ${BADGE_STYLES[dday.tone]}`}
                     >
                       {dday.label}
                     </span>
