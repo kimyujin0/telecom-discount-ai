@@ -6,6 +6,7 @@ import DiagnosisResult, { type DiagnosisResultData } from "./DiagnosisResult";
 import FollowUpQuestion from "./FollowUpQuestion";
 import FreeTextInput from "./FreeTextInput";
 import SiteHeader from "@/components/layout/SiteHeader";
+import { buildDiagnosisResumePath, DIAGNOSIS_CHAT_PATH, type ResumableDiagnosis } from "@/lib/diagnosis/resume";
 
 // "AI 분석 중" 체크리스트 연출이 너무 순식간에 지나가 보이지 않도록 최소 노출 시간을 보장한다.
 const ANALYZING_MIN_MS = 2000;
@@ -30,10 +31,13 @@ interface DiagnoseSuccessBody {
   benefits?: DiagnosisResultData["benefits"];
 }
 
-export default function DiagnosisExperience() {
-  const [phase, setPhase] = useState<Phase>("input");
+export default function DiagnosisExperience({ initialResume = null }: { initialResume?: ResumableDiagnosis | null }) {
+  // ?session=... 으로 돌아온 경우 입력 단계를 거치지 않고 저장돼 있던 결과 화면에서 바로 시작한다.
+  const [phase, setPhase] = useState<Phase>(initialResume ? "result" : "input");
   const [followUp, setFollowUp] = useState<FollowUpState | null>(null);
-  const [result, setResult] = useState<DiagnosisResultData | null>(null);
+  const [result, setResult] = useState<DiagnosisResultData | null>(initialResume?.result ?? null);
+  // 지금 보여주는 결과의 세션 id — 비로그인 상태에서 저장 버튼을 누르면 로그인 후 이 결과로 돌아오는 데 쓴다.
+  const [resultSessionId, setResultSessionId] = useState<string | null>(initialResume?.sessionId ?? null);
   const [errorText, setErrorText] = useState<string | null>(null);
 
   const sessionIdRef = useRef<string | null>(null);
@@ -77,6 +81,10 @@ export default function DiagnosisExperience() {
         totalYearlySaving: body.totalYearlySaving ?? 0,
         benefits: body.benefits ?? [],
       });
+      setResultSessionId(body.sessionId);
+      // 주소창에 결과의 세션 id를 남겨둔다 — 새로고침이나 로그인 화면에서 뒤로가기로 돌아와도 같은 결과가
+      // 복원된다. 이 브라우저가 만든 세션일 때만 복원되므로 URL이 공유돼도 다른 사람에게는 보이지 않는다.
+      window.history.replaceState(null, "", buildDiagnosisResumePath(body.sessionId));
       setPhase("result");
     } catch (error) {
       console.error("Failed to reach /api/diagnose", error);
@@ -91,7 +99,10 @@ export default function DiagnosisExperience() {
     lastMessageRef.current = "";
     setFollowUp(null);
     setResult(null);
+    setResultSessionId(null);
     setErrorText(null);
+    // 새 진단을 시작하니 주소창의 이전 결과 세션 id는 지운다(새로고침하면 옛 결과가 다시 뜨지 않게).
+    window.history.replaceState(null, "", DIAGNOSIS_CHAT_PATH);
     setPhase("input");
   };
 
@@ -111,7 +122,7 @@ export default function DiagnosisExperience() {
           {phase === "followup" && followUp && (
             <FollowUpQuestion question={followUp.question} quickReplies={followUp.quickReplies} onAnswer={runDiagnose} />
           )}
-          {phase === "result" && result && <DiagnosisResult result={result} onRestart={handleRestart} />}
+          {phase === "result" && result && <DiagnosisResult result={result} sessionId={resultSessionId} onRestart={handleRestart} />}
         </div>
       </main>
     </div>

@@ -19,6 +19,7 @@ import {
   MAX_FOLLOWUPS,
   type UserContext,
 } from "@/lib/chat/system-prompt";
+import { getOrCreateAnonymousKey } from "@/lib/diagnosis/anonymousKey";
 import { matchBenefitsForSlots, type MatchedBenefitRow } from "@/lib/diagnosisBenefitMatch";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -111,13 +112,17 @@ export async function POST(request: Request) {
   let dbMessages: StoredMessage[];
 
   if (!sessionId) {
+    // 비로그인 사용자는 브라우저 쿠키의 키로 세션을 표시한다 — 나중에 결과 화면으로 돌아오거나 로그인 후
+    // 내 계정에 연결(claim)할 때 "이 브라우저가 만든 세션"임을 증명하는 데 쓴다(lib/diagnosis/anonymousKey.ts).
+    const anonymousKey = authUser ? null : await getOrCreateAnonymousKey();
+
     const { data: session, error: sessionError } = await supabase
       .from("diagnosis_sessions")
       .insert({
         // 로그인 사용자는 user_id로 묶어 마이페이지에서 진단 이력을 찾을 수 있게 한다.
         // diagnosis_sessions_owner_check 제약 때문에 둘 중 하나는 반드시 있어야 한다.
         user_id: authUser?.id ?? null,
-        anonymous_key: authUser ? null : crypto.randomUUID(),
+        anonymous_key: anonymousKey,
         status: "in_progress",
       })
       .select("id")

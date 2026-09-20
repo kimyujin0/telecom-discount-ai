@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { safeNextPath } from "@/lib/auth/nextPath";
 import { PASSWORD_MIN_LENGTH, PASSWORD_SPECIAL_CHAR_REGEX } from "@/lib/auth/password";
 import { CARRIERS } from "@/lib/carriers";
+import { claimAnonymousSession } from "@/lib/diagnosis/claimSession";
+import { parseResumeSessionId } from "@/lib/diagnosis/resume";
 import { createSupabaseAuthClient } from "@/lib/supabase/auth";
 
 // 로그인/회원가입/로그아웃 서버 액션.
@@ -43,11 +46,15 @@ export interface AuthFormState {
   values?: { email?: string; nickname?: string; name?: string; carrier?: string };
 }
 
-/** 로그인 후 돌아갈 경로. 외부 도메인으로 튕기는 오픈 리다이렉트를 막기 위해 내부 절대경로만 허용한다. */
-function safeNextPath(raw: FormDataEntryValue | null): string {
-  if (typeof raw !== "string") return "/mypage";
-  if (!raw.startsWith("/") || raw.startsWith("//")) return "/mypage";
-  return raw;
+/**
+ * 로그인/회원가입에 성공한 직후, `next`가 "진단 결과 복귀" 경로(/diagnosis/chat?session=...)면 그 비로그인 진단을
+ * 방금 인증된 사용자의 것으로 연결한다. 그래야 결과 화면으로 돌아왔을 때 이 진단이 마이페이지 이력에도 남는다.
+ * 실패해도 로그인 자체는 성공으로 두므로 예외를 던지지 않는다(claimAnonymousSession은 false만 돌려준다).
+ */
+async function claimResumedDiagnosis(userId: string | undefined, nextPath: string): Promise<void> {
+  if (!userId) return;
+  const sessionId = parseResumeSessionId(nextPath);
+  if (sessionId) await claimAnonymousSession(userId, sessionId);
 }
 
 /** Supabase가 돌려주는 영문 오류 메시지를 사용자에게 보여줄 한국어 문구로 옮긴다. */
@@ -119,8 +126,11 @@ export async function signUpAction(_prevState: AuthFormState, formData: FormData
     return { emailConfirmationRequired: true, values: keptValues };
   }
 
+  const nextPath = safeNextPath(formData.get("next"));
+  await claimResumedDiagnosis(data.user?.id, nextPath);
+
   revalidatePath("/", "layout");
-  redirect(safeNextPath(formData.get("next")));
+  redirect(nextPath);
 }
 
 export async function signInAction(_prevState: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -140,7 +150,7 @@ export async function signInAction(_prevState: AuthFormState, formData: FormData
   }
 
   const supabase = await createSupabaseAuthClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
@@ -149,8 +159,11 @@ export async function signInAction(_prevState: AuthFormState, formData: FormData
     return { formError: translateAuthError(error.message), values: { email: rawEmail } };
   }
 
+  const nextPath = safeNextPath(formData.get("next"));
+  await claimResumedDiagnosis(data.user?.id, nextPath);
+
   revalidatePath("/", "layout");
-  redirect(safeNextPath(formData.get("next")));
+  redirect(nextPath);
 }
 
 export async function signOutAction(): Promise<void> {

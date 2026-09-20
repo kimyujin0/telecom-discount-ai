@@ -2,7 +2,8 @@
 
 import { Star } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SavedBenefitsApi } from "@/lib/saved/useSavedBenefits";
 
 type Hint = "login" | "error" | null;
@@ -17,20 +18,28 @@ function loginHrefForCurrentPage(): string {
 
 /**
  * "혜택 저장하기" 별 버튼. 저장돼 있으면 채워진 별로 바뀌어 저장 여부를 바로 알 수 있다.
- * 비로그인 상태로 누르면 페이지를 떠나지 않고(진단 결과를 잃지 않도록) 옆에 로그인 안내 말풍선만 잠깐 띄운다.
+ * 비로그인 상태로 누르면 loginHref가 있을 때는 로그인 페이지로 이동하고(돌아올 곳이 실려 있다), 없을 때는
+ * 페이지를 떠나지 않고 옆에 로그인 안내 말풍선만 잠깐 띄운다.
  */
 export default function SaveBenefitButton({
   benefitId,
   saver,
   showLabel = false,
   className = "",
+  loginHref,
 }: {
   benefitId: string;
   saver: SavedBenefitsApi;
+  /**
+   * 비로그인 상태에서 눌렀을 때 바로 이동할 로그인 경로. 주면 안내 말풍선 대신 곧장 이동한다 — 이 화면의
+   * 상태를 로그인 후에 되살릴 수 있을 때(진단 결과의 ?session=)만 넘긴다. 없으면 말풍선으로 안내만 한다.
+   */
+  loginHref?: string;
   /** 별 옆에 "저장하기"/"저장됨" 글자도 보여줄지 (공간이 넉넉한 곳에서만). */
   showLabel?: boolean;
   className?: string;
 }) {
+  const router = useRouter();
   const [hint, setHint] = useState<Hint>(null);
 
   const saved = saver.isSaved(benefitId);
@@ -42,14 +51,35 @@ export default function SaveBenefitButton({
     return () => window.clearTimeout(timer);
   }, [hint]);
 
-  const handleClick = async () => {
-    if (saver.loading || pending) return;
+  const handleSave = useCallback(async () => {
+    if (pending) return;
     if (!saver.loggedIn) {
+      if (loginHref) {
+        router.push(loginHref);
+        return;
+      }
       setHint("login");
       return;
     }
     const ok = await saver.setSaved(benefitId, !saved);
     setHint(ok ? null : "error");
+  }, [pending, saver, loginHref, router, benefitId, saved]);
+
+  // 로그인 상태/저장 목록을 아직 확인하는 중에 누른 클릭은 버리지 않고, 확인이 끝나는 순간 이어서 처리한다.
+  // (로그인 후 결과 화면으로 돌아오자마자 별을 누르는 경우가 특히 그렇다 — 조용히 무시되면 "안 눌렸나?" 싶어진다.)
+  const queuedClickRef = useRef(false);
+  useEffect(() => {
+    if (saver.loading || !queuedClickRef.current) return;
+    queuedClickRef.current = false;
+    void handleSave();
+  }, [saver.loading, handleSave]);
+
+  const handleClick = () => {
+    if (saver.loading) {
+      queuedClickRef.current = true;
+      return;
+    }
+    void handleSave();
   };
 
   const label = saved ? "저장 취소" : "혜택 저장하기";

@@ -4,6 +4,7 @@ import { ChevronDown, PartyPopper, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import SaveBenefitButton from "@/components/saved/SaveBenefitButton";
+import { buildLoginPathForDiagnosis } from "@/lib/diagnosis/resume";
 import { useSavedBenefits } from "@/lib/saved/useSavedBenefits";
 
 export interface DiagnosisResultBenefit {
@@ -13,6 +14,7 @@ export interface DiagnosisResultBenefit {
   title: string;
   category: string | null;
   estimatedMonthlySaving: number;
+  /** 진단 당시 추천 이유. 저장돼 있지 않은 옛 진단을 복원할 때는 빈 문자열일 수 있다. */
   reason: string;
 }
 
@@ -25,13 +27,19 @@ export interface DiagnosisResultData {
 
 export default function DiagnosisResult({
   result,
+  sessionId,
   onRestart,
 }: {
   result: DiagnosisResultData;
+  /** 이 결과의 진단 세션 id. 비로그인으로 저장하려 할 때 로그인 후 이 결과로 돌아오는 링크에 실린다. */
+  sessionId: string | null;
   onRestart: () => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(result.benefits[0]?.id ?? null);
   const saver = useSavedBenefits();
+  // 비로그인 상태에서 저장을 누르면 이 결과의 세션 id를 next로 실어 로그인 페이지로 보낸다.
+  // 로그인하면 /diagnosis/chat?session=<id> 로 돌아와 재진단 없이 같은 결과가 다시 보인다.
+  const loginHref = sessionId ? buildLoginPathForDiagnosis(sessionId) : undefined;
 
   return (
     <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
@@ -96,12 +104,14 @@ export default function DiagnosisResult({
                       className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                     />
                   </button>
-                  <SaveBenefitButton benefitId={benefit.id} saver={saver} />
+                  <SaveBenefitButton benefitId={benefit.id} saver={saver} loginHref={loginHref} />
                 </div>
 
                 {isExpanded && (
                   <div className="border-t border-zinc-100 px-4 py-3.5 dark:border-zinc-800">
-                    <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{benefit.reason}</p>
+                    {benefit.reason && (
+                      <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{benefit.reason}</p>
+                    )}
                     <Link
                       href={`/carriers?benefit=${benefit.id}`}
                       className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-primary-700 hover:underline dark:text-primary-400"

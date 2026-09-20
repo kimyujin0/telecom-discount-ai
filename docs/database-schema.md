@@ -42,13 +42,15 @@ diagnosis_sessions ──1:N──► diagnosis_messages (턴 기반 채팅 로�
 
 ### 2. `diagnosis_sessions` — 진단 세션 (채팅 세션 단위)
 
-로그인 없이도 진단 가능해야 하므로 `user_id`는 nullable, 비로그인 사용자는 `anonymous_key`(클라이언트 발급 UUID, 쿠키/localStorage 저장)로 식별한다.
+로그인 없이도 진단 가능해야 하므로 `user_id`는 nullable, 비로그인 사용자는 `anonymous_key`로 식별한다. `anonymous_key`는 **브라우저당 하나의 UUID**로, 서버가 httpOnly 쿠키(`tms_anon_key`, 30일)로 발급해 그 브라우저의 모든 비로그인 세션에 같은 값을 기록한다(`lib/diagnosis/anonymousKey.ts`).
+
+비로그인으로 진단한 뒤 로그인/회원가입하면 그 세션을 계정에 **연결(claim)**한다(`lib/diagnosis/claimSession.ts`): `user_id`를 채우고 `anonymous_key`는 비운다. "쿠키의 키 == 세션의 `anonymous_key`"이고 아직 `user_id`가 비어 있을 때만 되므로, 결과 URL(`/diagnosis/chat?session=<id>`)이 공유돼도 sessionId만 아는 사람은 그 진단을 보거나 가져갈 수 없다. 연결된 진단은 마이페이지 이력에 남는다.
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
 | `id` | uuid (PK) | |
 | `user_id` | uuid (FK → auth.users, nullable) | 로그인 사용자인 경우 |
-| `anonymous_key` | text (nullable) | 비로그인 사용자 식별용 |
+| `anonymous_key` | text (nullable) | 비로그인 세션의 소유 증명용 브라우저 키(쿠키 값). 로그인 계정에 연결(claim)되면 비운다 |
 | `status` | text | `in_progress` / `completed` / `abandoned` |
 | `carrier` | text (nullable) | 대화에서 확인한 이용 통신사. 로그인 사용자는 `profiles.carrier`를 확인만 받고 채운다 (0003) |
 | `tier` | text (nullable) | 대화에서 확인한 멤버십 등급. `lib/carrierTiers.ts`의 값 또는 `'모름'`(TIER_UNKNOWN) (0007) |
