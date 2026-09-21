@@ -124,6 +124,14 @@ KT는 "전 등급 공통 상시혜택" + "VIP·VVIP 전용 초이스 혜택" 구
 
 등급별로 보이는 혜택 수는 VVIP 21 > VIP 18 > GOLD/SILVER/WHITE/일반 13이다. GOLD·SILVER·WHITE·일반에만 해당하는 혜택은 없어서 이 네 등급은 전 등급 공통 혜택과 같다. "택1" 묶음(달달초이스/VIP초이스/VVIP초이스)은 항목을 각각 별도 행으로 두고 `usage_condition`에 "택1"을 적는다. 이 데이터는 `scripts/rebuild-kt-benefits.mjs`(멱등, `--dry-run` 지원)로 만든다 — 기존 행은 지우지 않고 같은 id로 제자리 수정한다(`saved_benefits`/`diagnosis_result_benefits`가 id를 참조). 대응이 없는 옛 행(CGV·메가박스)은 `is_active=false`로 내렸다. `estimated_monthly_saving`에는 금액을 알 수 없어 넣은 추정값이 있으며 스크립트 주석에 표시돼 있다. 화면에서는 6개 등급을 다 나열한 값을 `formatTierLabel()`이 "전체 등급"으로 줄여 보여준다.
 
+#### SKT · LG U+ 등급별 혜택 구조 (`source_url = 'carrier-page-seed'`)
+
+KT와 같은 "전 등급 공통" + "상위 등급 전용" 구조다. `scripts/rebuild-skt-lgu-benefits.mjs`(멱등, `--dry-run`/`--summary` 지원, 행 삭제 없음 — 기존 행은 같은 id로 제자리 수정, 대응이 없는 행은 `is_active=false`)로 적용한다.
+
+- **SKT** (`VIP,GOLD,SILVER`): 전 등급 공통 10종(할인율만 등급별로 다른 항목은 VIP 행 + `GOLD,SILVER` 행으로 분리 — 메가MGC커피·도미노피자·배민 처갓집·CU/세븐일레븐) + VIP 전용 4종(파리바게뜨·백미당·쉐이크쉑 해피아워, 티스테이션 VIP PICK). 등급별 혜택 수: VIP 14 > GOLD 10 = SILVER 10.
+- **LG U+** (`carrier='U+'`, provider `LG U+`, 등급 7단계): 전 등급 공통 3종 + VIP 이상 "나만의콕" 13종(tier `VVIP+,VVIP,VIP+,VIP`, 라이프콕 7종은 매월 택1) + 상위 전용 카페 혜택(스타벅스 VIP 더블사이즈업 → VVIP 아메리카노 톨 무료, 엔젤리너스 GOLD 50% / SILVER 30% → VVIP 무료). 등급별 혜택 수: VVIP+·VVIP 18 > VIP+·VIP 17 > GOLD 4 = SILVER 4 > 일반 3 (가치는 GOLD > SILVER > 일반).
+- 예상 월 절감액 중 스크립트에 "추정"으로 표시한 값은 임시값이다.
+
 ### 6. `persona_benefits` — 페르소나 ↔ 혜택 매핑 (N:M)
 
 혜택 매칭 로직의 기준 테이블. `weight`가 높을수록 해당 페르소나에게 우선 추천.
