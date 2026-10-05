@@ -44,7 +44,7 @@ export interface DiagnosisDetail {
 
 // personas!inner(name)/diagnosis_sessions!inner(user_id) 같은 to-one 임베드는 객체로 오지만, 생성된 DB
 // 타입이 없어 추론이 배열로 잡히는 경우가 있어 둘 다 받는다 (app/mypage/page.tsx의 기존 패턴과 동일).
-function unwrapToOne<T>(value: T | T[] | null | undefined): T | undefined {
+export function unwrapToOne<T>(value: T | T[] | null | undefined): T | undefined {
   return Array.isArray(value) ? value[0] : (value ?? undefined);
 }
 

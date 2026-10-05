@@ -43,7 +43,7 @@ const MAX_MATCHED_BENEFITS = 6;
  * 요금제 결합/캐시백 등 멤버십 등급과 무관한 혜택)라서 등급 조건에서 제외하지 않고 그대로 통과시킨다.
  * 등급 값이 있는 행(carrier-page-seed)만 tierMatches()로 걸러낸다.
  */
-function tierAllows(benefitTier: string | null, selectedTier: string | null): boolean {
+export function tierAllows(benefitTier: string | null, selectedTier: string | null): boolean {
   if (benefitTier === null) return true;
   // 등급을 모른다고 답한 경우엔 등급 조건을 걸지 않는다 (잘못 걸러내 빈 결과를 주는 쪽이 더 나쁘다).
   if (selectedTier === null || selectedTier === TIER_UNKNOWN) return true;

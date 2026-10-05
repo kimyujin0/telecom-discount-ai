@@ -5,6 +5,7 @@ import SiteFooter from "@/components/layout/SiteFooter";
 import SiteHeader from "@/components/layout/SiteHeader";
 import ChangePasswordForm from "@/components/mypage/ChangePasswordForm";
 import EditNicknameForm from "@/components/mypage/EditNicknameForm";
+import NowAvailableSection from "@/components/mypage/NowAvailableSection";
 import SavedBenefitsSection from "@/components/mypage/SavedBenefitsSection";
 import SavingsSummaryCard from "@/components/mypage/SavingsSummaryCard";
 import SignOutButton from "@/components/mypage/SignOutButton";
@@ -13,7 +14,9 @@ import { loadAnnualSavingGoal, loadBenefitUsages, summarizeUsages } from "@/lib/
 import { CARRIER_LABELS } from "@/lib/carriers";
 import { loadDiagnosisHistory } from "@/lib/diagnosisHistory";
 import { formatDate } from "@/lib/formatDate";
+import { loadNowAvailableBenefits } from "@/lib/loadNowAvailableBenefits";
 import { loadSavedBenefits } from "@/lib/savedBenefits";
+import { resolveViewerCarrierTier } from "@/lib/viewerCarrierTier";
 
 export const metadata: Metadata = {
   title: "마이페이지 | 티모산",
@@ -25,14 +28,16 @@ export const dynamic = "force-dynamic";
 
 export default async function MyPage() {
   const user = await requireUser("/mypage");
-  const [history, savedBenefits, usages, annualGoal] = await Promise.all([
+  const [history, savedBenefits, usages, annualGoal, viewer] = await Promise.all([
     loadDiagnosisHistory(user.id),
     loadSavedBenefits(user.id),
     loadBenefitUsages(user.id),
     loadAnnualSavingGoal(user.id),
+    resolveViewerCarrierTier(user.id),
   ]);
   const latestDiagnosis = history[0] ?? null;
   const { monthlyTotal, yearlyTotal } = summarizeUsages(usages);
+  const nowAvailable = viewer.carrier ? await loadNowAvailableBenefits(viewer.carrier, viewer.tier, usages) : [];
 
   return (
     <div className="flex min-h-dvh flex-col bg-white dark:bg-zinc-950">
@@ -49,6 +54,9 @@ export default async function MyPage() {
           <p className="mt-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
             가입 정보와 지금까지의 진단 이력을 확인할 수 있어요.
           </p>
+
+          {/* 지금 쓸 수 있는 혜택 — 혜택을 찾아보는 귀찮음을 없애는 게 목적이라 맨 위에 둔다. */}
+          <NowAvailableSection userId={user.id} viewer={viewer} items={nowAvailable} />
 
           {/* 절감액 요약 — 이번 달/올해 누적 + 연간 목표 진행률 ("티끌모아 태산"을 숫자로) */}
           <SavingsSummaryCard
