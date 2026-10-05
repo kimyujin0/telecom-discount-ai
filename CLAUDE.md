@@ -30,6 +30,26 @@
 2. 혜택 매칭 + 절감액 합산 ("티끌모아 태산" 문구로 노출)
 3. 카카오 "나에게 보내기" 연동
 
+## 혜택 사용 체크 + 누적 절감액
+
+"티끌모아 태산"(핵심 기능 우선순위 2번)을 숫자로 체감하게 하는 기능. 마이페이지 "저장한 혜택" 카드마다
+실제로 혜택을 썼는지 체크하고, 그 기록을 모아 이번 달/올해 누적 절감액과 연간 목표 진행률을 보여준다.
+
+- **DB**: `benefit_usages`(사용 기록: user_id, benefit_id, used_at, saved_amount) — `saved_benefits`와
+  같은 패턴으로 RLS가 본인 행만 허용, 브라우저가 anon 키로 직접 읽고 쓴다. `profiles.annual_saving_goal`
+  (사용자가 직접 입력한 연간 목표, null이면 최근 진단 결과의 예상 연간 절감액을 기본값으로 쓴다).
+  `benefits.estimated_monthly_saving`(0001 마이그레이션부터 있던 기존 컬럼)을 "썼어요" 버튼의 기본
+  입력값으로 재사용한다 — 이름이 다른 별도 컬럼을 새로 만들지 않았다.
+- **이번 주기 판정**: `lib/benefitUsageQuota.ts`가 `lib/dday.ts`/`lib/usageCycle.ts`의 기존 갱신 주기
+  판별(일간/월간/월간 창/연간/마감일) 로직을 그대로 재사용해 "이번 주기에 몇 번까지 쓸 수 있는지"와
+  "그 범위 안에서 몇 번 썼는지"를 비교한다. 한도를 다 쓰면 카드의 "썼어요" 버튼이 "이번 달 사용 완료" 등으로
+  바뀌고 비활성화되며, 실수로 눌렀을 때를 위해 항상 "취소"로 되돌릴 수 있다.
+- **시간대**: 날짜 비교는 전부 한국 시간(Asia/Seoul) 기준 — Vercel 서버가 UTC라서 그대로 비교하면 날짜가
+  하루 어긋난다. `lib/dday.ts`의 `todayInSeoul()`을 모든 날짜 계산(이번 달/올해 집계 포함)에 재사용한다.
+- **UI**: `components/mypage/SavingsSummaryCard.tsx`(이번 달/올해 누적 + 연간 목표 진행 막대 + 응원 문구),
+  `components/mypage/UseBenefitButton.tsx`(카드별 "썼어요"), `components/mypage/AnnualGoalForm.tsx`(목표
+  직접 입력). 모두 마이페이지(`app/mypage/page.tsx`)에서만 쓰인다.
+
 ## 기술 스택
 
 - **프레임워크**: Next.js (App Router, TypeScript, Tailwind CSS)

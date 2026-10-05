@@ -4,8 +4,8 @@ import { z } from "zod";
 import { PASSWORD_MIN_LENGTH, PASSWORD_SPECIAL_CHAR_REGEX } from "@/lib/auth/password";
 import { createSupabaseAuthClient } from "@/lib/supabase/auth";
 
-// 마이페이지에서 로그인 정보(닉네임/비밀번호)를 수정하는 서버 액션.
-// 둘 다 createSupabaseAuthClient()(anon 키 + 요청 쿠키)를 쓴다 — service role이 아니라 RLS가 적용되는
+// 마이페이지에서 로그인 정보(닉네임/비밀번호)와 절감액 요약의 연간 목표를 수정하는 서버 액션.
+// 모두 createSupabaseAuthClient()(anon 키 + 요청 쿠키)를 쓴다 — service role이 아니라 RLS가 적용되는
 // "본인 세션" 클라이언트라야 profiles_update_own 정책(0006_create_profiles.sql)과
 // supabase.auth.updateUser()가 "현재 로그인한 사용자 본인"만 수정하도록 보장한다.
 
@@ -42,6 +42,49 @@ export async function updateNicknameAction(
   if (error) {
     console.error("[account] failed to update nickname", error);
     return { formError: "닉네임을 저장하지 못했어요. 잠시 후 다시 시도해주세요." };
+  }
+
+  return { success: true };
+}
+
+export interface AnnualGoalFormState {
+  fieldError?: string;
+  formError?: string;
+  success?: boolean;
+}
+
+const MAX_ANNUAL_GOAL = 1_000_000_000; // 10억원 — 실수로 자릿수를 더 입력했을 때를 거르는 상한일 뿐, 실제 제한 의도는 아니다.
+
+/**
+ * 마이페이지 절감액 요약의 "연간 목표" 입력. 빈 값으로 제출하면 null로 지워서, 화면이 다시
+ * 최근 진단 결과의 예상 연간 절감액을 기본 목표로 보여주게 한다(lib/benefitUsages.ts 참고).
+ */
+export async function updateAnnualGoalAction(
+  _prevState: AnnualGoalFormState,
+  formData: FormData,
+): Promise<AnnualGoalFormState> {
+  const raw = String(formData.get("annualGoal") ?? "").trim();
+
+  let goal: number | null = null;
+  if (raw !== "") {
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > MAX_ANNUAL_GOAL) {
+      return { fieldError: "0 이상의 정수로 입력해주세요." };
+    }
+    goal = parsed;
+  }
+
+  const supabase = await createSupabaseAuthClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) return { formError: "로그인이 필요해요." };
+
+  const { error } = await supabase.from("profiles").update({ annual_saving_goal: goal }).eq("id", user.id);
+  if (error) {
+    console.error("[account] failed to update annual saving goal", error);
+    return { formError: "목표를 저장하지 못했어요. 잠시 후 다시 시도해주세요." };
   }
 
   return { success: true };

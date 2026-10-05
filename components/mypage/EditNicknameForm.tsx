@@ -32,11 +32,14 @@ export default function EditNicknameForm({ nickname }: { nickname: string }) {
   }
 
   // dispatchEvent/router.refresh()는 "외부 시스템에 알리기"라 useEffect가 맞다 — setState는 위에서 이미 처리했다.
+  // 의존성은 state.success가 아니라 state(참조) 전체로 둔다 — success는 리터럴 true/false라 닉네임을
+  // 두 번 연속 성공적으로 바꾸면("성공 → 성공") 값이 안 바뀌어 effect가 다시 실행되지 않는 버그가 있었다.
+  // state는 매 액션 호출마다 새 객체라 항상 바뀌므로, 두 번째 저장에서도 refresh가 호출된다.
   useEffect(() => {
     if (!state.success) return;
     window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
     router.refresh();
-  }, [state.success, router]);
+  }, [state, router]);
 
   if (!editing) {
     return (

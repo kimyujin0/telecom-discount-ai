@@ -1,10 +1,14 @@
 import { ChevronRight, Star } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { getUsageQuota, isWithinWindow, usageDoneLabel } from "@/lib/benefitUsageQuota";
+import type { BenefitUsageRow } from "@/lib/benefitUsages";
 import { CARRIER_LABELS, isCarrierKey } from "@/lib/carriers";
 import { getDdayInfo, sortByUrgency, todayInSeoul, type DdayTone } from "@/lib/dday";
 import { formatDiscount, formatValidTo, resolveCategoryLabel } from "@/lib/formatBenefit";
 import type { SavedBenefitItem } from "@/lib/savedBenefits";
 import UnsaveButton from "./UnsaveButton";
+import UseBenefitButton from "./UseBenefitButton";
 
 // 배지 색: 오늘 사용 가능은 초록, 임박(빨강)·곧(노랑)·그 외(회색). 마감일 기준과 월간(이번 달 말일) 기준의 색 경계는
 // lib/dday.ts에서 각각 정한다 — 여기서는 단계별 색만 맞춘다.
@@ -20,7 +24,16 @@ const BADGE_STYLES: Record<DdayTone, string> = {
 };
 
 /** 마이페이지 "저장한 혜택" — 마감 임박(D-3 이하)이 맨 위, 마감된 혜택이 맨 아래. */
-export default function SavedBenefitsSection({ userId, items }: { userId: string; items: SavedBenefitItem[] }) {
+export default function SavedBenefitsSection({
+  userId,
+  items,
+  usages,
+}: {
+  userId: string;
+  items: SavedBenefitItem[];
+  /** 혜택 사용 기록 전체(로그인 사용자) — "썼어요" 버튼이 이번 주기에 이미 한도를 다 썼는지 판단하는 데 쓴다. */
+  usages: BenefitUsageRow[];
+}) {
   // 마이페이지가 force-dynamic이라 요청마다 오늘 날짜를 새로 계산한다.
   const today = todayInSeoul();
   const sorted = sortByUrgency(items, today);
@@ -61,6 +74,35 @@ export default function SavedBenefitsSection({ userId, items }: { userId: string
             const carrierLabel = isCarrierKey(item.carrier) ? CARRIER_LABELS[item.carrier] : item.carrier;
             const categoryLabel = resolveCategoryLabel(item.category);
             const validToLabel = formatValidTo(item.validTo);
+
+            // "썼어요" 버튼 상태 — dday.tone이 이미 "지금 쓸 수 있는 시점인지"를 판정해 둔 걸 그대로 따른다.
+            //   expired  : 끝난 혜택이라 사용 기록 자체를 남길 수 없다 — 버튼을 숨긴다.
+            //   upcoming : 아직 이용 가능 기간이 아니다(예: 매월 15일부터) — 비활성 안내만 보여준다.
+            //   그 외    : lib/benefitUsageQuota.ts로 이번 주기 한도를 다 썼는지 센다.
+            let usageButton: ReactNode = null;
+            if (dday.tone !== "expired") {
+              if (dday.tone === "upcoming") {
+                usageButton = <UseBenefitButton userId={userId} benefitId={item.benefitId} amountDefault={item.estimatedMonthlySaving} usedUp={false} upcomingLabel={dday.label} />;
+              } else {
+                const quota = getUsageQuota(item.validTo, today, usageCondition);
+                const inWindow = quota
+                  ? usages
+                      .filter((u) => u.benefitId === item.benefitId && isWithinWindow(todayInSeoul(new Date(u.usedAt)), quota))
+                      .sort((a, b) => b.usedAt.localeCompare(a.usedAt))
+                  : [];
+                const usedUp = quota !== null && quota.limit !== null && inWindow.length >= quota.limit;
+                usageButton = (
+                  <UseBenefitButton
+                    userId={userId}
+                    benefitId={item.benefitId}
+                    amountDefault={item.estimatedMonthlySaving}
+                    usedUp={usedUp}
+                    doneLabel={quota ? usageDoneLabel(quota.kind) : undefined}
+                    lastUsageId={inWindow[0]?.id ?? null}
+                  />
+                );
+              }
+            }
 
             return (
               <li
@@ -121,6 +163,7 @@ export default function SavedBenefitsSection({ userId, items }: { userId: string
                       예상 월 절감액 {item.estimatedMonthlySaving.toLocaleString()}원
                     </p>
                   </div>
+                  {usageButton}
                   <div className="text-right">
                     {validToLabel && (
                       <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{validToLabel}</p>

@@ -6,8 +6,10 @@ import SiteHeader from "@/components/layout/SiteHeader";
 import ChangePasswordForm from "@/components/mypage/ChangePasswordForm";
 import EditNicknameForm from "@/components/mypage/EditNicknameForm";
 import SavedBenefitsSection from "@/components/mypage/SavedBenefitsSection";
+import SavingsSummaryCard from "@/components/mypage/SavingsSummaryCard";
 import SignOutButton from "@/components/mypage/SignOutButton";
 import { requireUser } from "@/lib/auth/session";
+import { loadAnnualSavingGoal, loadBenefitUsages, summarizeUsages } from "@/lib/benefitUsages";
 import { CARRIER_LABELS } from "@/lib/carriers";
 import { loadDiagnosisHistory } from "@/lib/diagnosisHistory";
 import { formatDate } from "@/lib/formatDate";
@@ -23,8 +25,14 @@ export const dynamic = "force-dynamic";
 
 export default async function MyPage() {
   const user = await requireUser("/mypage");
-  const [history, savedBenefits] = await Promise.all([loadDiagnosisHistory(user.id), loadSavedBenefits(user.id)]);
+  const [history, savedBenefits, usages, annualGoal] = await Promise.all([
+    loadDiagnosisHistory(user.id),
+    loadSavedBenefits(user.id),
+    loadBenefitUsages(user.id),
+    loadAnnualSavingGoal(user.id),
+  ]);
   const latestDiagnosis = history[0] ?? null;
+  const { monthlyTotal, yearlyTotal } = summarizeUsages(usages);
 
   return (
     <div className="flex min-h-dvh flex-col bg-white dark:bg-zinc-950">
@@ -41,6 +49,14 @@ export default async function MyPage() {
           <p className="mt-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
             가입 정보와 지금까지의 진단 이력을 확인할 수 있어요.
           </p>
+
+          {/* 절감액 요약 — 이번 달/올해 누적 + 연간 목표 진행률 ("티끌모아 태산"을 숫자로) */}
+          <SavingsSummaryCard
+            monthlyTotal={monthlyTotal}
+            yearlyTotal={yearlyTotal}
+            goal={annualGoal}
+            goalDefault={latestDiagnosis?.totalYearlySaving ?? null}
+          />
 
           {/* 로그인 정보 */}
           <section className="mt-8 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900">
@@ -90,7 +106,7 @@ export default async function MyPage() {
           </section>
 
           {/* 저장한 혜택 (마감 임박순 정렬 + D-day 배지) */}
-          <SavedBenefitsSection userId={user.id} items={savedBenefits} />
+          <SavedBenefitsSection userId={user.id} items={savedBenefits} usages={usages} />
 
           {/* 비밀번호 변경 */}
           <section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-7 dark:border-zinc-800 dark:bg-zinc-900">

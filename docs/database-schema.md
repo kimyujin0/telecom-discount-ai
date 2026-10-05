@@ -199,12 +199,33 @@ Supabase Auth의 `auth.users`에는 서비스 고유 컬럼을 추가할 수 없
 
 `(user_id, benefit_id)`가 PK라 같은 혜택은 한 번만 저장된다. 마감일은 복사해두지 않고 `benefits.valid_to`를 조인해서 읽는다 — D-day 배지 계산은 `lib/dday.ts`.
 
+### 11. `benefit_usages` — 혜택 사용 기록 (마이페이지 "썼어요" 버튼)
+
+"저장한 혜택" 카드의 "썼어요" 버튼이 남기는 사용 기록. 절감액 요약 카드(이번 달/올해 누적)와 카드별
+"이번 주기 사용 완료" 표시가 이 테이블을 센다.
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | uuid (PK, default `gen_random_uuid()`) | |
+| `user_id` | uuid (FK → auth.users, cascade delete) | 사용 기록을 남긴 사용자 |
+| `benefit_id` | uuid (FK → benefits, cascade delete) | 사용한 혜택 |
+| `used_at` | timestamptz (default now()) | 사용 시각 — 한국 날짜 비교는 `todayInSeoul(new Date(used_at))` |
+| `saved_amount` | integer (>= 0) | 이번 사용으로 아낀 금액(원). 버튼이 `benefits.estimated_monthly_saving`을 기본값으로 보여주고 사용자가 고칠 수 있다 |
+
+삭제는 "썼어요"를 잘못 눌렀을 때의 취소 동작이다(행을 지우기만 함, 수정 UPDATE는 없음). "이번 주기에
+이미 한도를 다 썼는지"는 이 테이블의 날짜가 아니라 `lib/benefitUsageQuota.ts`가 혜택마다
+`usage_condition`/`valid_to`를 해석해서 계산한 기간과 비교해 판정한다(`lib/dday.ts`의 D-day 판정과
+같은 우선순위 — 마감일이 있으면 그것만 본다).
+
+`profiles`에는 이 기능을 위해 `annual_saving_goal`(integer, nullable) 컬럼도 추가했다 — 사용자가
+직접 입력한 연간 절감 목표. null이면 화면에서 최근 진단 결과의 예상 연간 절감액을 기본 목표로 보여준다.
+
 ## 접근 제어 (RLS) 방침
 
 - 모든 테이블 RLS 활성화
 - `personas`, `benefits`, `persona_benefits`(카탈로그성 데이터)는 `anon` 역할에 **읽기 전용** 허용
 - `profiles`는 **본인 행만** 읽기/수정 허용(`auth.uid() = id`). INSERT 정책은 두지 않는다 — 행 생성은 위 트리거만 담당한다.
-- `saved_benefits`는 **본인 행만** select/insert/delete 허용(`auth.uid() = user_id`), update 정책은 없다. 브라우저(anon 키 + 로그인 세션)가 RLS로 직접 읽고 쓴다.
+- `saved_benefits` / `benefit_usages`는 **본인 행만** select/insert/delete 허용(`auth.uid() = user_id`), update 정책은 없다. 브라우저(anon 키 + 로그인 세션)가 RLS로 직접 읽고 쓴다.
 - `diagnosis_sessions` / `diagnosis_messages` / `diagnosis_results` / `diagnosis_result_benefits` / `kakao_send_logs`는 클라이언트가 직접 접근하지 않고, **`app/api/` 라우트 핸들러가 Supabase service role 키로만 접근** (서버에서 세션 소유권 검증 후 처리) — RLS는 anon/authenticated에 대해 기본 차단(deny-all)으로 둔다.
 
 ## 마이그레이션 파일
@@ -223,3 +244,5 @@ Supabase Auth의 `auth.users`에는 서비스 고유 컬럼을 추가할 수 없
 | [`0008_add_profiles_nickname_name.sql`](../supabase/migrations/0008_add_profiles_nickname_name.sql) | `profiles.nickname` / `name` + 가입 트리거 갱신 |
 | [`0009_add_diagnosis_result_benefits_reason.sql`](../supabase/migrations/0009_add_diagnosis_result_benefits_reason.sql) | `diagnosis_result_benefits.reason` (진단 시점 추천 이유 스냅샷) |
 | [`0010_create_saved_benefits.sql`](../supabase/migrations/0010_create_saved_benefits.sql) | `saved_benefits` 테이블 + 본인 행 전용 RLS |
+| [`0011_create_benefit_usages.sql`](../supabase/migrations/0011_create_benefit_usages.sql) | `benefit_usages` 테이블 + 본인 행 전용 RLS |
+| [`0012_add_profiles_annual_saving_goal.sql`](../supabase/migrations/0012_add_profiles_annual_saving_goal.sql) | `profiles.annual_saving_goal` |

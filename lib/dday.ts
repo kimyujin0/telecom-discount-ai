@@ -63,18 +63,19 @@ export function todayInSeoul(now: Date = new Date()): string {
   }).format(now);
 }
 
-function parseDate(date: string): { year: number; month: number; day: number } {
+/** 다른 모듈(lib/benefitUsageQuota.ts)도 같은 날짜 산술을 쓰도록 export한다. */
+export function parseDate(date: string): { year: number; month: number; day: number } {
   const [year, month, day] = date.split("-").map(Number);
   return { year, month, day };
 }
 
-function toUtcDayNumber(date: string): number {
+export function toUtcDayNumber(date: string): number {
   const { year, month, day } = parseDate(date);
   return Date.UTC(year, month - 1, day) / 86_400_000;
 }
 
 /** month는 1~12. 윤년의 2월도 정확히 센다. */
-function daysInMonth(year: number, month: number): number {
+export function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
